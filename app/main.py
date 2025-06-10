@@ -80,12 +80,9 @@ async def favicon():
 @app.on_event("startup")
 async def startup_event():
     try:
-        # Ensure all directories exist and are writable
+        # Just ensure directories exist (permissions already set in Dockerfile)
         for subdir in SUB_DIRECTORIES:
-            dir_path = STATIC_DIR / subdir
-            dir_path.mkdir(exist_ok=True, mode=0o755)
-            # Change ownership to appuser (uid=1000 typically)
-            os.chown(dir_path, 1000, 1000)
+            (STATIC_DIR / subdir).mkdir(exist_ok=True, mode=0o755)
     except Exception as e:
         logger.error(f"Failed to setup directories: {str(e)}")
         raise

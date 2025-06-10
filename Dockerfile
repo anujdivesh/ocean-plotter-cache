@@ -43,10 +43,10 @@ ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1
 
 # Create static directory with correct permissions
-RUN mkdir -p /app/static && \
-    chmod 755 /app/static
-
-
+RUN mkdir -p /app/static/{maps,legend,tide,basemap,eez,pacificnames,thredds,coastline} && \
+    chown -R appuser:appuser /app/static && \
+    chmod -R 755 /app/static
+    
 # Run as non-root user for security
 RUN useradd -m appuser && \
     chown -R appuser:appuser /app
