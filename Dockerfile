@@ -3,7 +3,7 @@ FROM python:3.12-slim-bookworm as builder
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (combine commands to reduce layers)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
@@ -11,11 +11,11 @@ RUN apt-get update && \
     libgeos-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and activate virtual environment
+# Create and activate virtual environment (better than --user install)
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Python dependencies
+# Install Python dependencies (with pip cache disabled)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -27,16 +27,8 @@ WORKDIR /app
 # Install minimal runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libgeos-c1v5 && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Create appuser first
-RUN useradd -m -u 1000 appuser
-
-# Create directories with correct permissions in one layer
-RUN mkdir -p /app/static && \
-    mkdir -p /app/static/{maps,legend,tide,basemap,eez,pacificnames,thredds,coastline} && \
-    chown -R appuser:appuser /app/static && \
-    chmod -R 755 /app/static
 
 # Copy virtual env from builder
 COPY --from=builder /opt/venv /opt/venv
@@ -50,11 +42,34 @@ ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Ensure appuser owns the /app directory
-RUN chown -R appuser:appuser /app
+# Create static directory with correct permissions
+RUN mkdir -p /app/static && \
+    chmod 755 /app/static
 
+RUN mkdir -p /app/static/basemap && \
+    chmod 755 /app/static/basemap
+
+RUN mkdir -p /app/static/coastline && \
+    chmod 755 /app/static/coastline
+RUN mkdir -p /app/static/eez && \
+    chmod 755 /app/static/eez
+RUN mkdir -p /app/static/legend && \
+    chmod 755 /app/static/legend
+RUN mkdir -p /app/static/maps && \
+    chmod 755 /app/static/maps
+RUN mkdir -p /app/static/pacificnames && \
+    chmod 755 /app/static/pacificnames
+RUN mkdir -p /app/static/thredds && \
+    chmod 755 /app/static/thredds
+RUN mkdir -p /app/static/tide && \
+    chmod 755 /app/static/tide
+
+# Run as non-root user for security
+RUN useradd -m appuser && \
+    chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
 
+# Optimized Uvicorn command
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
