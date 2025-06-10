@@ -85,16 +85,16 @@ async def startup_event():
             try:
                 dir_path.mkdir(exist_ok=True, mode=0o775)
             except PermissionError:
-                logger.error(f"Permission denied creating {dir_path}")
+                logger.error("Permission denied creating %s", dir_path)
                 # Try changing permissions if directory exists
                 if dir_path.exists():
                     try:
                         dir_path.chmod(0o775)
                     except PermissionError:
-                        logger.error(f"Couldn't fix permissions for {dir_path}")
+                        logger.error("Couldn't fix permissions for %s", dir_path)
                         raise
     except Exception as e:
-        logger.error(f"Failed to setup directories: {str(e)}")
+        logger.error("Failed to setup directories: %s", str(e))
         raise
 
 #CRONTAB CLEANUP TASKS
