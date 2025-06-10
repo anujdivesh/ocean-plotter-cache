@@ -53,9 +53,7 @@ app.add_middleware(
 ocean_router = APIRouter(prefix="/plotter")
 
 # Configuration
-#STATIC_DIR = Path(__file__).parent.parent / "app" / "static"
 STATIC_DIR = Path(__file__).parent.parent / "app" / "static"
-#STATIC_DIR =  Path("/app/static")
 SUB_DIRECTORIES_TO_CLEAN = ["maps", "tide", "thredds"]  
 # List of subdirectories you want to create
 SUB_DIRECTORIES = [
@@ -80,23 +78,7 @@ async def favicon():
 
 @app.on_event("startup")
 async def startup_event():
-    try:
-        for subdir in SUB_DIRECTORIES:
-            dir_path = STATIC_DIR / subdir
-            try:
-                dir_path.mkdir(exist_ok=True, mode=0o775)
-            except PermissionError:
-                logger.error(f"Permission denied creating {dir_path}")
-                # Try changing permissions if directory exists
-                if dir_path.exists():
-                    try:
-                        dir_path.chmod(0o775)
-                    except PermissionError:
-                        logger.error(f"Couldn't fix permissions for {dir_path}")
-                        raise
-    except Exception as e:
-        logger.error(f"Failed to setup directories: {str(e)}")
-        raise
+    Plotter.setup_static_directories(STATIC_DIR,SUB_DIRECTORIES)
 
 #CRONTAB CLEANUP TASKS
 def schedule_cleanup():
