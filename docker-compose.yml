@@ -15,7 +15,7 @@ services:
       - "8086:8000"
     volumes:
       - ./app:/app/app:z
-      - ./app/static:/app/static:z
+      - ./app/static:/app/static
     environment:
       - RELOAD=${RELOAD:-false}
       - WORKERS=${WORKERS:-1} #6
