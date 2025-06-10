@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  ocean-plotter:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    mem_limit: 8g
+    mem_reservation: 6g
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    ports:
+      - "8086:8000"
+    volumes:
+      - ./app:/app/app
+      - ./app/static:/app/static
+    environment:
+      - RELOAD=${RELOAD:-false}
+      - WORKERS=${WORKERS:-1} #6
+      - UVICORN_WORKERS=${WORKERS:-1}  # Explicit worker count 6
+      - UVICORN_TIMEOUT_KEEP_ALIVE=60  # Keep-alive timeout
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

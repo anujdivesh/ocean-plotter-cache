@@ -1,0 +1,805 @@
+[
+  {
+    "country_code": "ASM",
+    "name": "Tula",
+    "lat": -14.25806,
+    "lon": 189.43584
+  },
+  {
+    "country_code": "ASM",
+    "name": "Faleāsao",
+    "lat": -14.2222,
+    "lon": 190.48723
+  },
+  {
+    "country_code": "ASM",
+    "name": "Etena",
+    "lat": -11.051495,
+    "lon": 188.9294466
+  },
+   {
+    "country_code": "COK",
+    "name": "Roto",
+    "lat": -10.88321,
+    "lon": 194.18026
+  },
+  {
+    "country_code": "COK",
+    "name": "Kikau",
+    "lat": -11.55686,
+    "lon": 194.58433
+  },
+  {
+    "country_code": "COK",
+    "name": "Tukao",
+    "lat": -10.37518,
+    "lon": 198.98982
+  },
+  {
+    "country_code": "COK",
+    "name": "Te Tautua",
+    "lat": -8.958729,
+    "lon": 202.07379
+  },
+  {
+    "country_code": "COK",
+    "name": "Nivano",
+    "lat": -9.6179,
+    "lon": 198.89824
+  },
+  {
+    "country_code": "COK",
+    "name": "Palmerston",
+    "lat": -18.05525,
+    "lon": 196.79116
+  },
+  {
+    "country_code": "COK",
+    "name": "Atai",
+    "lat": -19.86209,
+    "lon": 202.29616
+  },
+  {
+    "country_code": "COK",
+    "name": "Station de Copra",
+    "lat": -19.26432,
+    "lon": 200.03683
+  },
+  {
+    "country_code": "COK",
+    "name": "Kimiangatau",
+    "lat": -20.43367,
+    "lon": 201.54352
+  },
+  {
+    "country_code": "COK",
+    "name": "Tamarua",
+    "lat": -21.95045,
+    "lon": 201.99201
+  },
+  {
+    "country_code": "COK",
+    "name": "Rarotonga",
+    "lat": -21.22742,
+    "lon": 200.22168
+  },
+  {
+    "country_code": "FSM",
+    "name": "Chuuk",
+    "lat": 7.45,
+    "lon": 151.85
+  },
+  {
+    "country_code": "FSM",
+    "name": "Ponhnpei",
+    "lat": 6.9178,
+    "lon": 158.185
+  },
+  {
+    "country_code": "FSM",
+    "name": "Kosrae",
+    "lat": 5.3136,
+    "lon": 163.0083
+  },
+  {
+    "country_code": "FSM",
+    "name": "Yap",
+    "lat": 9.5167,
+    "lon": 138.1167
+  },
+  {
+    "country_code": "FSM",
+    "name": "Eauripik",
+    "lat": 6.68700,
+    "lon": 143.03749
+  },
+  {
+    "country_code": "FSM",
+    "name": "Kapingamarangi",
+    "lat": 1.27861,
+    "lon": 153.90758
+  },
+  {
+    "country_code": "FJI",
+    "name": "Viti Levu",
+    "lat": -17.725916,
+    "lon": 175.10694
+  },
+  {
+    "country_code": "FJI",
+    "name": "Vanua Levu",
+    "lat": -16.003044,
+    "lon": 178.613812
+  },
+  {
+    "country_code": "FJI",
+    "name": "Suva",
+    "lat": -18.226316,
+    "lon": 178.429308
+  },
+  {
+    "country_code": "FJI",
+    "name": "Kadavu Islands",
+    "lat": -19.295537,
+    "lon": 177.986691
+  },
+  {
+    "country_code": "FJI",
+    "name": "Rotuma",
+    "lat": -12.547463,
+    "lon": 176.98925
+  },
+  {
+    "country_code": "FJI",
+    "name": "Ba",
+    "lat": -17.300431,
+    "lon": 177.581787
+  },
+  {
+    "country_code": "PYF",
+    "name": "Papeete",
+    "lat": -17.5347,
+    "lon": 210.43157
+  },
+  {
+    "country_code": "PYF",
+    "name": "Petei",
+    "lat": -16.446179,
+    "lon": 207.75175
+  },
+  {
+    "country_code": "PYF",
+    "name": "Moerai",
+    "lat": -22.45132,
+    "lon": 208.65809
+  },
+  {
+    "country_code": "PYF",
+    "name": "Anua",
+    "lat": -23.37782,
+    "lon": 210.47337
+  },
+  {
+    "country_code": "PYF",
+    "name": "Vaiuru",
+    "lat": -23.86976,
+    "lon": 212.35428
+  },
+  {
+    "country_code": "PYF",
+    "name": "Rapa",
+    "lat": -27.6,
+    "lon": 215.68334
+  },
+  {
+    "country_code": "PYF",
+    "name": "Tepaetia",
+    "lat": -14.94518,
+    "lon": 212.30748
+  },
+  {
+    "country_code": "PYF",
+    "name": "Rouru",
+    "lat": -23.1301,
+    "lon": 225.03467
+  },
+  {
+    "country_code": "PYF",
+    "name": "Tavava",
+    "lat": -19.27825,
+    "lon": 221.2261
+  },
+  {
+    "country_code": "PYF",
+    "name": "Tapuarava",
+    "lat": -18.46647,
+    "lon": 223.53673
+  },
+  {
+    "country_code": "PYF",
+    "name": "Tehekega",
+    "lat": -14.1,
+    "lon": 218.56667
+  },
+  {
+    "country_code": "PYF",
+    "name": "Teonemahina",
+    "lat": -15.0111,
+    "lon": 219.00000
+  },
+  {
+    "country_code": "PYF",
+    "name": "Ouia",
+    "lat": -10.48509,
+    "lon": 221.38125
+  },
+  {
+    "country_code": "PYF",
+    "name": "Hakahetau",
+    "lat": -9.3627,
+    "lon": 219.89691
+  },
+  {
+    "country_code": "KIR",
+    "name": "Gilbert Islands",
+    "lat": 0.113386,
+    "lon": 172.356599
+  },
+  {
+    "country_code": "KIR",
+    "name": "Phoenix Islands",
+    "lat": -3.7,
+    "lon": 188.3
+  },
+  {
+    "country_code": "KIR",
+    "name": "Line Islands",
+    "lat": 2,
+    "lon": 202.5
+  },
+  {
+    "country_code": "KIR",
+    "name": "Onouea Island",
+    "lat": 4.67053,
+    "lon": 199.62403
+  },
+  {
+    "country_code": "KIR",
+    "name": "Napari",
+    "lat": 3.90806,
+    "lon": 200.61168
+  },
+  {
+    "country_code": "KIR",
+    "name": "Rungata",
+    "lat": -1.29148,
+    "lon": 176.68469
+  },
+  {
+    "country_code": "KIR",
+    "name": "Tarawa",
+    "lat": 1.45094,
+    "lon": 172.96946
+  },
+   {
+    "country_code": "MHL",
+    "name": "Ebon",
+    "lat": 4.58199,
+    "lon": 168.69636
+  },
+  {
+    "country_code": "MHL",
+    "name": "Kili Island",
+    "lat": 5.64387,
+    "lon": 169.12109
+  },
+  {
+    "country_code": "MHL",
+    "name": "Mili Atoll",
+    "lat": 6.0815,
+    "lon": 171.73502
+  },
+  {
+    "country_code": "MHL",
+    "name": "Aur Atoll",
+    "lat": 8.14897,
+    "lon": 171.1699
+  },
+  {
+    "country_code": "MHL",
+    "name": "Wotje Atoll",
+    "lat": 9.45429,
+    "lon": 170.23674
+  },
+  {
+    "country_code": "MHL",
+    "name": "Ailuk Atoll",
+    "lat": 10.22052,
+    "lon": 169.97819
+  },
+  {
+    "country_code": "MHL",
+    "name": "Wotho Atoll",
+    "lat": 10.16575,
+    "lon": 166.01022
+  },
+  {
+    "country_code": "MHL",
+    "name": "Enewetak Atoll",
+    "lat": 11.3509,
+    "lon": 162.34104
+  },
+  {
+    "country_code": "MHL",
+    "name": "Utrik",
+    "lat": 11.22509,
+    "lon": 169.84662
+  },
+  {
+  "country_code": "NRU",
+  "name": "Yaren",
+  "lat": -0.55085,
+  "lon": 166.9252
+  },
+   {
+    "country_code": "NCL",
+    "name": "Nouméa",
+    "lat": -22.27406,
+    "lon": 166.44883
+  },
+  {
+    "country_code": "NCL",
+    "name": "Nouméa",
+    "lat": -22.27406,
+    "lon": 166.44883
+  },
+  {
+    "country_code": "NCL",
+    "name": "Koumac",
+    "lat": -20.5666,
+    "lon": 164.28333
+  },
+  {
+    "country_code": "NCL",
+    "name": "Ognat",
+    "lat": -20.47635,
+    "lon": 166.65235
+  },
+  {
+    "country_code": "NCL",
+    "name": "Inagod",
+    "lat": -21.01745,
+    "lon": 167.37413
+  },
+  {
+    "country_code": "NCL",
+    "name": "Vao",
+    "lat": -22.66645,
+    "lon": 167.49627
+  },
+  {
+    "country_code": "NCL",
+    "name": "Wakone",
+    "lat": -21.65932,
+    "lon": 168.09293
+  },
+  {
+    "country_code": "NCL",
+    "name": "Panane",
+    "lat": -19.58332,
+    "lon": 163.58332
+  },
+  {
+    "country_code": "NIU",
+    "name": "Avatele",
+    "lat": -19.12449,
+    "lon": 190.08862
+  },
+  {
+    "country_code": "NIU",
+    "name": "Alofi",
+    "lat": -18.91429851,
+    "lon": 189.8640548
+  },
+  {
+    "country_code": "MNP",
+    "name": "Sinapalo",
+    "lat": 14.166079,
+    "lon": 145.23169
+  },
+  {
+    "country_code": "MNP",
+    "name": "Marpo Heghts Hamlet",
+    "lat": 14.97974,
+    "lon": 145.63686
+  },
+  {
+    "country_code": "MNP",
+    "name": "Tanapag",
+    "lat": 15.24205,
+    "lon": 145.75625
+  },
+  {
+    "country_code": "MNP",
+    "name": "Alamagan",
+    "lat": 17.61252,
+    "lon": 145.82147
+  },
+  {
+    "country_code": "MNP",
+    "name": "Pagan",
+    "lat": 18.12538,
+    "lon": 145.75937
+  },
+  {
+    "country_code": "MNP",
+    "name": "Agrihan",
+    "lat": 18.73638,
+    "lon": 145.65295
+  },
+  {
+    "country_code": "PLW",
+    "name": "Pulo Anna",
+    "lat": 4.65404,
+    "lon": 131.94900
+  },
+  {
+    "country_code": "PLW",
+    "name": "Hatohobei",
+    "lat": 2.99266,
+    "lon": 131.17572
+  },
+  {
+    "country_code": "PLW",
+    "name": "Angaur",
+    "lat": 6.90612,
+    "lon": 134.12931
+  },
+  {
+    "country_code": "PLW",
+    "name": "Kayangel",
+    "lat": 8.07349,
+    "lon": 134.71616
+  },
+  {
+    "country_code": "PLW",
+    "name": "Sonsorol Islands",
+    "lat": 5.32656,
+    "lon": 132.22357
+  },
+  {
+    "country_code": "PLW",
+    "name": "Malakal",
+    "lat": 7.33265,
+    "lon": 134.45367
+  },
+  {
+    "country_code": "PNG",
+    "name": "Port Moresby",
+    "lat": -9.47723,
+    "lon": 147.15089
+  },
+  {
+    "country_code": "PNG",
+    "name": "Bougainville Island",
+    "lat": -5.11000,
+    "lon": 153.35469
+  },
+  {
+    "country_code": "PNG",
+    "name": "Lorengau",
+    "lat": -2.0341,
+    "lon": 147.27173
+  },
+  {
+    "country_code": "PNG",
+    "name": "Kavieng",
+    "lat": -2.57337,
+    "lon": 150.79516
+  },
+  {
+    "country_code": "PNG",
+    "name": "Pomio",
+    "lat": -5.5086,
+    "lon": 151.49349
+  },
+  {
+    "country_code": "PNG",
+    "name": "Alotau",
+    "lat": -10.31509,
+    "lon": 150.45742
+  },
+  {
+    "country_code": "PNG",
+    "name": "Londolvit",
+    "lat": -3.06767,
+    "lon": 152.637
+  },
+  {
+    "country_code": "PNG",
+    "name": "Lae",
+    "lat": -6.72333,
+    "lon": 146.99611
+  },
+  {
+  "country_code": "PCN",
+  "name": "Pitcairn Islands",
+  "lat": -25.06597,
+  "lon": 229.89853
+  },
+   {
+    "country_code": "WSM",
+    "name": "Apia",
+    "lat": -13.83333,
+    "lon": 188.23334
+  },
+  {
+    "country_code": "WSM",
+    "name": "Falealupo",
+    "lat": -13.50103,
+    "lon": 187.21232
+  },
+  {
+    "country_code": "SLB",
+    "name": "Honiara",
+    "lat": -9.43333,
+    "lon": 159.54999
+  },
+  {
+    "country_code": "SLB",
+    "name": "Nimbau",
+    "lat": -11.27607,
+    "lon": 166.487789
+  },
+  {
+    "country_code": "SLB",
+    "name": "Rennell Island",
+    "lat": -11.65602,
+    "lon": 160.280159
+  },
+  {
+    "country_code": "SLB",
+    "name": "Choiseul",
+    "lat": -7.08424,
+    "lon": 157.016649
+  },
+  {
+    "country_code": "SLB",
+    "name": "Santa Isabel Island",
+    "lat": -7.5635,
+    "lon": 158.44046
+  },
+  {
+    "country_code": "SLB",
+    "name": "Malaita",
+    "lat": -8.91667,
+    "lon": 160.93333
+  },
+  {
+    "country_code": "SLB",
+    "name": "San Cristobal",
+    "lat": -10.56667,
+    "lon": 161.866669
+  },
+  {
+    "country_code": "SLB",
+    "name": "Vanikoro Is",
+    "lat": -11.616669,
+    "lon": 166.966669
+  },
+  {
+    "country_code": "SLB",
+    "name": "Lata",
+    "lat": -10.725,
+    "lon": 165.79722
+  },
+  {
+    "country_code": "TKL",
+    "name": "Apia",
+    "lat": -9.13393,
+    "lon": 188.20597
+  },
+  {
+    "country_code": "TKL",
+    "name": "Te Lafu",
+    "lat": -9.33997,
+    "lon": 188.79923
+  },
+  {
+    "country_code": "TKL",
+    "name": "Atafu",
+    "lat": -8.54212,
+    "lon": 187.48409
+  },
+  {
+    "country_code": "TUV",
+    "name": "Nanumea",
+    "lat": -5.6833,
+    "lon": 176.1333
+  },
+  {
+    "country_code": "TUV",
+    "name": "Nanumanga",
+    "lat": -6.2833,
+    "lon": 176.3167
+  },
+  {
+    "country_code": "TUV",
+    "name": "Nui",
+    "lat": -7.2333,
+    "lon": 177.15
+  },
+  {
+    "country_code": "TUV",
+    "name": "Vaitupu",
+    "lat": -7.4833,
+    "lon": 178.6667
+  },
+  {
+    "country_code": "TUV",
+    "name": "Nukufetau",
+    "lat": -8.0333,
+    "lon": 178.3333
+  },
+  {
+    "country_code": "TUV",
+    "name": "Funafuti",
+    "lat": -8.5167,
+    "lon": 179.2167
+  },
+  {
+    "country_code": "TUV",
+    "name": "Nukulaelae",
+    "lat": -9.3833,
+    "lon": 179.85
+  },
+  {
+    "country_code": "TUV",
+    "name": "Nuilakita",
+    "lat": -10.75,
+    "lon": 179.4667
+  },
+  {
+    "country_code": "TON",
+    "name": "Niuatoputapu",
+    "lat": -15.96252,
+    "lon": 186.23797
+  },
+  {
+    "country_code": "TON",
+    "name": "Niuafo'ou",
+    "lat": -15.55815,
+    "lon": 184.43394
+  },
+  {
+    "country_code": "TON",
+    "name": "Vava'u",
+    "lat": -18.64524,
+    "lon": 186.23495
+  },
+  {
+    "country_code": "TON",
+    "name": "Ha'apai",
+    "lat": -19.72651,
+    "lon": 186.15008
+  },
+  {
+    "country_code": "TON",
+    "name": "E'ua",
+    "lat": -21.4535,
+    "lon": 185.04344
+  },
+  {
+    "country_code": "TON",
+    "name": "Nuku'alofa",
+    "lat": -21.13683,
+    "lon": 184.79886
+  },
+  {
+    "country_code": "TON",
+    "name": "Tofua",
+    "lat": -19.78563,
+    "lon": 184.9285
+  },
+  {
+    "country_code": "VUT",
+    "name": "Port Vila",
+    "lat": -17.73648,
+    "lon": 168.31366
+  },
+  {
+    "country_code": "VUT",
+    "name": "Luganville",
+    "lat": -15.51989,
+    "lon": 167.16235
+  },
+  {
+    "country_code": "VUT",
+    "name": "Sola",
+    "lat": -13.87611,
+    "lon": 167.55167
+  },
+  {
+    "country_code": "VUT",
+    "name": "Lenakel",
+    "lat": -19.53087,
+    "lon": 169.2676
+  },
+  {
+    "country_code": "VUT",
+    "name": "Aneghowhat",
+    "lat": -20.23557,
+    "lon": 169.78289
+  },
+  {
+    "country_code": "VUT",
+    "name": "Port Narvin",
+    "lat": -18.74771,
+    "lon": 169.20665
+  },
+  {
+    "country_code": "VUT",
+    "name": "Aniwa",
+    "lat": -19.25396,
+    "lon": 169.59582
+  },
+  {
+    "country_code": "VUT",
+    "name": "Lasoa",
+    "lat": -19.52999,
+    "lon": 170.20237
+  },
+  {
+    "country_code": "VUT",
+    "name": "Port Vato",
+    "lat": -16.33333,
+    "lon": 168.03333
+  },
+  {
+    "country_code": "WLF",
+    "name": "Toloke",
+    "lat": -14.30807,
+    "lon": 181.88337
+
+  },
+  {
+    "country_code": "WLF",
+    "name": "Mata'utu",
+    "lat": -13.28000,
+    "lon": 183.82439
+  },
+  {
+    "country_code": "WLF",
+    "name": "Toloke",
+    "lat": -14.30807,
+    "lon": 181.88337
+
+  },
+  {
+    "country_code": "WLF",
+    "name": "Mata'utu",
+    "lat": -13.28000,
+    "lon": 183.82439
+  },
+{ "country_code": "PAC", "name": "Vanuatu", "lat": -16.080487408731486, "lon": 168.40534337802882 },
+{ "country_code": "PAC", "name": "Solomon Islands", "lat": -9.967838101024077, "lon": 162.09674412068554 },
+{ "country_code": "PAC", "name": "Samoa", "lat": -13.172711611689317, "lon": 185.97533816697566 },
+{ "country_code": "PAC", "name": "Papua New Guinea", "lat": -3.0920518786745825, "lon": 141.17291971107446 },
+{ "country_code": "PAC", "name": "Palau", "lat": 5.570264933080279, "lon": 130.1163436326148 },
+{ "country_code": "PAC", "name": "Niue", "lat": -19.033666545225778, "lon": 187.80805664961676 },
+{ "country_code": "PAC", "name": "Nauru", "lat": 0.11775406281784252, "lon": 163.57541641209238 },
+{ "country_code": "PAC", "name": "Marshall Islands", "lat": 11.51202353744469, "lon": 168.11828608111807 },
+{ "country_code": "PAC", "name": "Kiribati", "lat": -3.3704, "lon": 191.266 },
+{ "country_code": "PAC", "name": "Fiji", "lat": -20.016834197744387, "lon": 176.17675793682787 },
+{ "country_code": "PAC", "name": "Tonga", "lat": -23.75853403817666, "lon": 183.340904567294 },
+{ "country_code": "PAC", "name": "Tuvalu", "lat": -6.91385117874739, "lon": 173.6279695032331 },
+{ "country_code": "PAC", "name": "Federated States of Micronesia", "lat": 8.83490465073968, "lon": 136.04782131262013 },
+{ "country_code": "PAC", "name": "Tokelau", "lat": -9.124597285278977, "lon": 184.2083151272179 },
+{ "country_code": "PAC", "name": "Pitcairn Islands", "lat":-23.66749374, "lon": 228.9338021 },
+{ "country_code": "PAC", "name": "Guam", "lat": 13.498521117078333, "lon": 140.7347707657081 },
+{ "country_code": "PAC", "name": "New Caledonia", "lat": -19.179482803391984, "lon": 157.8890973610775 },
+{ "country_code": "PAC", "name": "French Polynesia", "lat": -13.13454525370177, "lon": 211.54247462464073 },
+{ "country_code": "PAC", "name": "Northern Mariana", "lat": 19.671512579448756, "lon": 143.55410678164552 },
+{ "country_code": "PAC", "name": "Cook Islands", "lat": -19.921351865956755, "lon": 195.65958730226032 }
+
+  ]
