@@ -1200,6 +1200,7 @@ class Plotter:
             ax.text(x + 0.1, y + 0.1, name,
                     fontsize=6, color='black',
                     ha='left', va='center')
+    """
     @staticmethod
     def setup_static_directories(STATIC_DIR,SUB_DIRECTORIES):
         """Create all required static subdirectories"""
@@ -1210,6 +1211,18 @@ class Plotter:
         for sub_dir in SUB_DIRECTORIES:
             dir_path = STATIC_DIR / sub_dir
             dir_path.mkdir(exist_ok=True)
+    """
+    @staticmethod
+    def setup_static_directories(base_dir: Path, sub_dirs: list):
+        """Create required directories with proper permissions."""
+        try:
+            for sub_dir in sub_dirs:
+                dir_path = base_dir / sub_dir
+                dir_path.mkdir(exist_ok=True, mode=0o755)
+                logger.info(f"Created directory: {dir_path}")
+        except Exception as e:
+            logger.error(f"Error creating directories: {e}")
+            raise
 
     @staticmethod
     def clean_old_files(

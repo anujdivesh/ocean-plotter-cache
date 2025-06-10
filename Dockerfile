@@ -11,7 +11,7 @@ RUN apt-get update && \
     libgeos-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and activate virtual environment (better than --user install)
+# Create and activate virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -34,40 +34,25 @@ RUN apt-get update && \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application code
-COPY . .
+# Create appuser before copying files to ensure proper ownership
+RUN useradd -m appuser && \
+    mkdir -p /app/static && \
+    mkdir -p /app/app && \
+    chown -R appuser:appuser /app
+
+# Switch to appuser for file operations
+USER appuser
+
+# Copy application code (now as appuser)
+COPY --chown=appuser:appuser . .
 
 # Set environment variables
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Create static directory with correct permissions
-RUN mkdir -p /app/static && \
-    chmod 755 /app/static
-
-RUN mkdir -p /app/static/basemap && \
-    chmod 755 /app/static/basemap
-
-RUN mkdir -p /app/static/coastline && \
-    chmod 755 /app/static/coastline
-RUN mkdir -p /app/static/eez && \
-    chmod 755 /app/static/eez
-RUN mkdir -p /app/static/legend && \
-    chmod 755 /app/static/legend
-RUN mkdir -p /app/static/maps && \
-    chmod 755 /app/static/maps
-RUN mkdir -p /app/static/pacificnames && \
-    chmod 755 /app/static/pacificnames
-RUN mkdir -p /app/static/thredds && \
-    chmod 755 /app/static/thredds
-RUN mkdir -p /app/static/tide && \
-    chmod 755 /app/static/tide
-
-# Run as non-root user for security
-RUN useradd -m appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+# Create static subdirectories with correct permissions
+RUN mkdir -p /app/static/{basemap,coastline,eez,legend,maps,pacificnames,thredds,tide}
 
 EXPOSE 8000
 
