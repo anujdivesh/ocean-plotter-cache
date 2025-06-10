@@ -55,7 +55,7 @@ ocean_router = APIRouter(prefix="/plotter")
 # Configuration
 #BASE_DIR = Path(__file__).parent.parent
 #STATIC_DIR = BASE_DIR / "app" / "static"
-STATIC_DIR = Path("/app/static") 
+STATIC_DIR = Path("/app/app/static") 
 STATIC_DIR.mkdir(exist_ok=True, parents=True)
 
 SUB_DIRECTORIES_TO_CLEAN = ["maps", "tide", "thredds"]  
