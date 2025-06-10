@@ -54,7 +54,7 @@ ocean_router = APIRouter(prefix="/plotter")
 
 # Configuration
 BASE_DIR = Path(__file__).parent.parent
-STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR = BASE_DIR / "app" / "static"
 STATIC_DIR.mkdir(exist_ok=True, parents=True)
 
 SUB_DIRECTORIES_TO_CLEAN = ["maps", "tide", "thredds"]  
@@ -83,7 +83,6 @@ async def favicon():
 async def startup_event():
     """Initialize application state."""
     try:
-        logger.info("Starting Ocean Plotter service")
         Plotter.setup_static_directories(STATIC_DIR, SUB_DIRECTORIES)
         
         # Initialize scheduler for cleanup tasks
@@ -95,9 +94,7 @@ async def startup_event():
             next_run_time=datetime.now()
         )
         scheduler.start()
-        logger.info("Scheduler started")
     except Exception as e:
-        logger.error(f"Startup failed: {e}")
         raise
 
 async def cleanup_old_files():
