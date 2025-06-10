@@ -80,9 +80,19 @@ async def favicon():
 @app.on_event("startup")
 async def startup_event():
     try:
-        # Just ensure directories exist (permissions already set in Dockerfile)
         for subdir in SUB_DIRECTORIES:
-            (STATIC_DIR / subdir).mkdir(exist_ok=True, mode=0o755)
+            dir_path = STATIC_DIR / subdir
+            try:
+                dir_path.mkdir(exist_ok=True, mode=0o775)
+            except PermissionError:
+                logger.error(f"Permission denied creating {dir_path}")
+                # Try changing permissions if directory exists
+                if dir_path.exists():
+                    try:
+                        dir_path.chmod(0o775)
+                    except PermissionError:
+                        logger.error(f"Couldn't fix permissions for {dir_path}")
+                        raise
     except Exception as e:
         logger.error(f"Failed to setup directories: {str(e)}")
         raise

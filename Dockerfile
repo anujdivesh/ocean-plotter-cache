@@ -30,13 +30,16 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Create appuser first
-RUN useradd -m -u 1000 appuser
+RUN useradd -u 1000 -g 1000 -m appuser
 
-# Create directories with correct permissions in one layer
+# Create all static directories with correct permissions in one layer
 RUN mkdir -p /app/static && \
     mkdir -p /app/static/{maps,legend,tide,basemap,eez,pacificnames,thredds,coastline} && \
     chown -R appuser:appuser /app/static && \
-    chmod -R 755 /app/static
+    chmod -R 775 /app/static
+
+# After copying all files, ensure appuser owns everything
+RUN chown -R appuser:appuser /app
 
 # Copy virtual env from builder
 COPY --from=builder /opt/venv /opt/venv
