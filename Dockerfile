@@ -1,5 +1,5 @@
 # Stage 2: Runtime stage
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-bookworm as build-stage
 
 WORKDIR /app
 
