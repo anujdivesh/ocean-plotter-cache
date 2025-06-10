@@ -53,11 +53,8 @@ app.add_middleware(
 ocean_router = APIRouter(prefix="/plotter")
 
 # Configuration
-#BASE_DIR = Path(__file__).parent.parent
-#STATIC_DIR = BASE_DIR / "app" / "static"
-STATIC_DIR = Path("/app/app/static") 
-STATIC_DIR.mkdir(exist_ok=True, parents=True)
-
+#STATIC_DIR = Path(__file__).parent.parent / "app" / "static"
+STATIC_DIR =  Path("/app/static/plots")
 SUB_DIRECTORIES_TO_CLEAN = ["maps", "tide", "thredds"]  
 # List of subdirectories you want to create
 SUB_DIRECTORIES = [
@@ -82,33 +79,36 @@ async def favicon():
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize application state."""
-    try:
-        Plotter.setup_static_directories(STATIC_DIR, SUB_DIRECTORIES)
-        
-        # Initialize scheduler for cleanup tasks
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(
-            cleanup_old_files,
-            'interval',
-            days=1,
-            next_run_time=datetime.now()
-        )
-        scheduler.start()
-    except Exception as e:
-        raise
+    Plotter.setup_static_directories(STATIC_DIR,SUB_DIRECTORIES)
 
-async def cleanup_old_files():
-    """Cleanup old files from static directories."""
-    cutoff = datetime.now() - timedelta(days=30)
-    for sub_dir in SUB_DIRECTORIES:
-        dir_path = STATIC_DIR / sub_dir
-        if dir_path.exists():
-            for file in dir_path.iterdir():
-                if file.is_file() and datetime.fromtimestamp(file.stat().st_mtime) < cutoff:
-                    file.unlink()
-                    logger.info(f"Deleted old file: {file}")
+#CRONTAB CLEANUP TASKS
+def schedule_cleanup():
+    """Schedule periodic cleanup of old files to run every 10 days"""
+    scheduler = BackgroundScheduler()
+    
+    # Configure the job to run every 10 days
+    scheduler.add_job(
+        Plotter.clean_old_files,
+        'interval',
+        days=10,  # Changed from days=1 to days=10
+        args=[STATIC_DIR, SUB_DIRECTORIES_TO_CLEAN],
+        kwargs={'expire_days': CACHE_EXPIRE_DAYS}
+    )
+    
+    scheduler.start()
 
+# Example usage in FastAPI startup
+@app.on_event("startup")
+async def startup_tasks():
+    # Initial immediate cleanup
+    Plotter.clean_old_files(
+        static_dir=STATIC_DIR,
+        subdirectories=SUB_DIRECTORIES_TO_CLEAN,
+        expire_days=CACHE_EXPIRE_DAYS
+    )
+    
+    # Schedule recurring cleanup every 10 days
+    schedule_cleanup()
 
 #ROOT
 @ocean_router.get("/")
