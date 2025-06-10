@@ -18,7 +18,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install Python dependencies (with pip cache disabled)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
+RUN pip install --no-cache-dir gunicorn
 # Stage 2: Runtime stage
 FROM python:3.12-slim-bookworm
 
@@ -69,4 +69,13 @@ RUN mkdir -p /app/static/tide && \
 EXPOSE 8000
 
 # Optimized Uvicorn command
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+#CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "4", \
+     "--threads", "2", \
+     "--timeout", "120", \
+     "--keep-alive", "60", \
+     "--max-requests", "1000", \
+     "--max-requests-jitter", "50", \
+     "app.main:app"]

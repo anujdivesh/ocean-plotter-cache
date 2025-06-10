@@ -34,6 +34,7 @@ import zlib
 import gzip
 from typing import Dict
 import logger
+from fastapi.middleware.gzip import GZipMiddleware
 
 app = FastAPI(
     docs_url="/plotter/docs",
@@ -41,14 +42,15 @@ app = FastAPI(
     openapi_url="/plotter/openapi.json",
     favicon_url="/plotter/favicon.ico"
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["*"],  # Tighten this in production
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=3600  # 1 hour cache for CORS preflight
 )
 ocean_router = APIRouter(prefix="/plotter")
 
