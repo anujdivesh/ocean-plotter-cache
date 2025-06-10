@@ -14,7 +14,7 @@ services:
     ports:
       - "8086:8000"
     volumes:
-      - ./app:/app/app
+      - ./app:/app
       - ./app/static:/app/static
     environment:
       - RELOAD=${RELOAD:-false}

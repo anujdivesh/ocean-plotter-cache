@@ -46,33 +46,10 @@ ENV PYTHONPATH=/app \
 RUN mkdir -p /app/static && \
     chmod 755 /app/static
 
-RUN mkdir -p /app/static/basemap && \
-    chmod 755 /app/static/basemap
+RUN mkdir -p /app/static/{maps,legend,tide,basemap,eez,pacificnames,thredds,coastline} && \
+    chown -R appuser:appuser /app/static
 
-    RUN mkdir -p /app/static/maps && \
-    chmod 755 /app/static/maps
-
-RUN mkdir -p /app/static/legend && \
-    chmod 755 /app/static/legend
-
-RUN mkdir -p /app/static/tide && \
-    chmod 755 /app/static/tide
-
-RUN mkdir -p /app/static/basemap && \
-    chmod 755 /app/static/basemap
-
-RUN mkdir -p /app/static/eez && \
-    chmod 755 /app/static/eez
-
-RUN mkdir -p /app/static/pacificnames && \
-    chmod 755 /app/static/pacificnames
-
-RUN mkdir -p /app/static/thredds && \
-    chmod 755 /app/static/thredds
-
-RUN mkdir -p /app/static/coastline && \
-    chmod 755 /app/static/coastline
-
+    
 # Run as non-root user for security
 RUN useradd -m appuser && \
     chown -R appuser:appuser /app
