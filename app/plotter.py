@@ -506,6 +506,13 @@ class Plotter:
                     end_date = start_date + relativedelta(months=2)
                     formatted_range = f"{start_date.strftime('%b')} - {end_date.strftime('%b %Y')}"
                     title_suffix = "%s : %s" % (cleaned, formatted_range)
+        if "{8week}" in layer_map_data.get_map_names[1]:
+            name = layer_map_data.get_map_names[1].replace("{8week}", "")
+            dataset_text =  layer_map_data.get_map_names[2]
+            formatted_date = date.strftime("%-d %B %Y")
+            future_date = date + timedelta(days=7)
+            formatted_future_date = future_date.strftime("%-d %B %Y")
+            title_suffix = "%s: %s - %s" % ( layer_map_data.get_map_names[0],formatted_date,formatted_future_date)
 
         return title_suffix, dataset_text
 
