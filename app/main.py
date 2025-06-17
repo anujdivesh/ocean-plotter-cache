@@ -3,7 +3,7 @@ from pathlib import Path
 # Add /app to Python path (since Docker copies files to /app)
 sys.path.append(str(Path(__file__).parent))
 from typing import Union
-from fastapi import FastAPI, Request, Response, APIRouter, HTTPException
+from fastapi import FastAPI, Request, Response, APIRouter, HTTPException,Query
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 import io
 import matplotlib.pyplot as plt  # Correct import
@@ -501,6 +501,20 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
         if 'temp_file' in locals() and temp_file.exists():
             temp_file.unlink()
 
+@ocean_router.get("/proxy")
+async def proxy(url: str = Query(..., description="Full URL to proxy")):
+    async with httpx.AsyncClient() as client:
+        try:
+            r = await client.get(url)
+            # Always return 200 OK
+            return Response(
+                content=r.content,
+                status_code=200,
+                media_type=r.headers.get("content-type", "application/octet-stream"),
+            )
+        except Exception:
+            # On error, return 200 OK with empty content
+            return Response(content=b"", status_code=200, media_type="application/octet-stream")
 #CACHE EEZ
 GEOSERVER_URL = "https://geonode.pacificdata.org/geoserver"
 TILE_SERVER_URL = "https://spc-osm.spc.int/tile/{z}/{x}/{y}.png"
