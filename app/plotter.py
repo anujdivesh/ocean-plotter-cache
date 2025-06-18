@@ -28,6 +28,10 @@ from dateutil.relativedelta import relativedelta
 from typing import List, Union
 from pathlib import Path
 import matplotlib
+from scipy.interpolate import NearestNDInterpolator
+import matplotlib as mpl
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 matplotlib.use('Agg')  # Non-interactive backend
 plt.switch_backend('Agg') 
 
@@ -1292,3 +1296,235 @@ class Plotter:
                         data.append(record)
         
         return pd.DataFrame(data)
+
+    @staticmethod
+    def extract_from_dap_ugrid(url, target_time, variable_name, mesh_lon_name='mesh_node_lon',
+                        mesh_lat_name='mesh_node_lat', mesh_tri_name='mesh_face_node'):
+        """
+        Extracts variable data, mesh node coordinates, and triangulation from an OpenDAP URL for a given time.
+
+        Parameters
+        ----------
+        url : str
+            OpenDAP/NetCDF URL.
+        target_time : str
+            ISO timestamp (e.g., '2025-05-25T23:00:00.000000000').
+        variable_name : str
+            Name of the variable to extract.
+        mesh_lon_name, mesh_lat_name : str
+            Names of longitude and latitude variables for mesh nodes.
+        mesh_tri_name : str
+            Name of variable containing face-node connectivity (triangles).
+        
+        Returns
+        -------
+        lon, lat : np.ndarray
+            Mesh node coordinates.
+        triangles : np.ndarray
+            Face-node connectivity.
+        data : np.ndarray
+            Variable data at the closest time step, masked for NaNs.
+        act_time : str
+            The actual model time string used.
+        """
+        try:
+            with xr.open_dataset(url, mask_and_scale=True, decode_cf=True) as ds:
+                # Handle time axis
+                if isinstance(ds.time.values[0], bytes):
+                    time_str = [t.decode('utf-8') for t in ds.time.values]
+                    time_dt = np.array([datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ") for t in time_str])
+                else:
+                    time_dt = [pd.to_datetime(t).to_pydatetime() for t in ds.time.values]
+                # Convert target time
+                if "." in target_time:
+                    target_dt = pd.to_datetime(target_time).to_pydatetime()
+                else:
+                    target_dt = datetime.strptime(target_time, "%Y-%m-%dT%H:%M:%SZ")
+                # Find closest time
+                time_index = np.argmin([abs((t - target_dt).total_seconds()) for t in time_dt])
+                act_time = str(ds.time.values[time_index])
+                # Extract mesh coordinates and triangles
+                lon = ds[mesh_lon_name].data
+                lat = ds[mesh_lat_name].data
+                triangles = ds[mesh_tri_name].data
+                # Extract variable
+                if variable_name not in ds.variables:
+                    raise ValueError(f"Variable '{variable_name}' not found. Available: {list(ds.variables.keys())}")
+                var = ds[variable_name].isel(time=time_index)
+                # If variable has 3 dims (e.g. (depth, node, face)), select first
+                if len(var.shape) == 3:
+                    var = var.isel({var.dims[0]: 0})
+                # Reduce to 1D if needed
+                data = np.ma.masked_invalid(var.data.squeeze())
+                return lon, lat, triangles, data, act_time
+        except Exception as e:
+            raise RuntimeError(f"Error accessing OpenDAP data: {str(e)}")
+    
+    @staticmethod
+    def plot_mesh_variable(
+            lon, lat, triangles, data,
+            vmin=None, vmax=None, 
+            cmap='viridis', var_label='Variable', units='', 
+            levels=None, 
+            ax=None, ax_legend=None, 
+            outdir=None, fname_prefix='plot', time=None,
+            show=False
+        ):
+        """
+        Plot a variable on unstructured mesh and return plot and colorbar handles.
+        If ax and ax_legend are provided, plot on them; else create new figure.
+        If outdir is given, save to file.
+        """
+        # Triangulation and mask NaNs (for unstructured mesh)
+        triang = mpl.tri.Triangulation(lon, lat, triangles)
+        mask = np.any(np.isnan(data[triang.triangles]), axis=1)
+        triang.set_mask(mask)
+
+        # Setup colormap and norm
+        if levels is not None:
+            norm = mpl.colors.BoundaryNorm(levels, ncolors=256, clip=True)
+        else:
+            norm = None
+
+        # Setup axes
+        created_fig = False
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(10, 8))
+            created_fig = True
+
+        # Plotting
+        tcf = ax.tricontourf(
+            triang, data,
+            levels=levels if levels is not None else 60,
+            cmap=cmap, vmin=vmin, vmax=vmax, norm=norm
+        )
+        ax.set_aspect('equal')
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        if time:
+            ax.set_title(f'{var_label} {time}')
+            
+        # Colorbar
+        if ax_legend is not None:
+            cbar = plt.colorbar(tcf, cax=ax_legend)
+        elif created_fig:
+            cbar = plt.colorbar(tcf, ax=ax)
+        else:
+            cbar = None
+        if cbar is not None:
+            if levels is not None:
+                cbar.set_ticks(levels)
+            cbar.set_label(f"{var_label} {units}")
+
+        # Save if requested
+        if outdir is not None:
+            os.makedirs(outdir, exist_ok=True)
+            fname = f"{fname_prefix}_{time.replace(':','').replace('-','').replace('T','_')}.png" if time else f"{fname_prefix}.png"
+            plt.savefig(os.path.join(outdir, fname), dpi=180)
+        if show and created_fig:
+            plt.show()
+        if created_fig:
+            plt.close()
+        return tcf, cbar
+
+    @staticmethod
+    def get_custom_colormap(nColors=None, vmin=None, vmax=None, cmap_name='gist_ncar', cmap=None):
+        if cmap is None:
+            cmap = plt.cm.get_cmap(cmap_name)
+        if nColors is not None:
+            bounds = np.linspace(vmin, vmax, nColors+1)
+            norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+            return cmap, norm, bounds
+        return cmap
+
+    @staticmethod
+    def plot_ugrid_mesh(ax2,url,target_time,variable_name,min_color_plot,max_color_plot,steps,unit,title,is_direction,get_custom_colormap,extract_from_dap_ugrid,west_bound):
+        lon, lat, triangles, data, act_time = extract_from_dap_ugrid(url, target_time, variable_name)
+        hs_dir = None
+        if is_direction:
+            _, _, _, hs_dir, _ = extract_from_dap_ugrid(url, target_time, 'dirm')
+        else:
+            hs_dir = None
+
+        fcmap = os.path.join(os.path.abspath('.'), 'Hs_colormap.dat')
+        colors = np.loadtxt(fcmap)
+        colors = np.hstack((colors, np.ones((len(colors[:, 1]), 1))))
+        cmap = mpl.colors.ListedColormap(colors)
+        nColors = int(np.ceil(max_color_plot / steps))
+        cmap, norm, bounds = get_custom_colormap(nColors=nColors, vmin=min_color_plot, vmax=max_color_plot, cmap=cmap)
+        ticks = bounds[::5] if len(bounds) > 10 else bounds
+
+        levels = np.arange(min_color_plot, max_color_plot + steps, steps)
+        if triangles.min() == 1:
+            triangles = triangles - 1
+
+        if (float(west_bound) < 0) and (lon.min() > 0):
+            lon = np.where(lon > 180, lon - 360, lon)
+        elif (float(west_bound) > 0) and (lon.min() < 0):
+            lon = np.where(lon < 0, lon + 360, lon)
+
+        lon_min, lon_max = np.nanmin(lon), np.nanmax(lon)
+        lat_min, lat_max = np.nanmin(lat), np.nanmax(lat)
+        lon_margin = (lon_max - lon_min) * 0.01
+        lat_margin = (lat_max - lat_min) * 0.01
+
+        plot_west = lon_min - lon_margin + 0.011
+        plot_east = lon_max + lon_margin - 0.011
+        plot_south = lat_min - lat_margin + 0.011
+        plot_north = lat_max + lat_margin - 0.011
+
+        ax2.cla()
+        divider = make_axes_locatable(ax2)
+        ax_legend = divider.append_axes("right", size="5%", pad=0.12)
+
+        triang = mpl.tri.Triangulation(lon, lat, triangles)
+        nan_mask = np.isnan(data)
+        tri_mask = np.any(np.where(nan_mask[triang.triangles], True, False), axis=1)
+        triang.set_mask(tri_mask)
+
+        cs = ax2.tricontourf(triang, data, cmap=cmap, norm=norm, levels=levels)
+
+        ax2.set_xlim(plot_west, plot_east)
+        ax2.set_ylim(plot_south, plot_north)
+        ax2.set_aspect('auto')
+        ax2.tick_params(axis='both', labelsize=6)
+        ax2.set_title(title,pad=10, fontsize=8)
+        ax2.grid(
+            which='both',
+            color='lightgray',
+            linestyle=':',
+            linewidth=0.8,
+            alpha=0.8
+        )
+        if hs_dir is not None:
+            x_arr = np.linspace(lon.min(), lon.max(), 30)
+            y_arr = np.linspace(lat.min(), lat.max(), 30)
+            xlon, ylat = np.meshgrid(x_arr, y_arr)
+            xlon = xlon.flatten()
+            ylat = ylat.flatten()
+            from scipy.interpolate import NearestNDInterpolator
+            interp = NearestNDInterpolator(list(zip(lon, lat)), hs_dir)
+            zdir = interp(xlon, ylat)
+            zdir = 270 - zdir
+            zdir[zdir < 0] += 360
+            udir = np.cos(np.deg2rad(zdir))
+            vdir = np.sin(np.deg2rad(zdir))
+            ax2.quiver(xlon, ylat, udir, vdir, units='xy', zorder=2, color='k', width=0.003, headwidth=3, headlength=5, alpha=0.8)
+
+        sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        cbar = mpl.pyplot.colorbar(
+            sm,
+            cax=ax_legend,
+            orientation='vertical',
+            extend='max',
+            format='{x:.2f}',
+            drawedges=True,
+            label=f'{unit}',
+            norm=norm,
+            ticks=ticks,
+            boundaries=bounds
+        )
+        cbar.ax.tick_params(labelsize=6)
+        cbar.set_label(f'{unit}', fontsize=6)
+        ax_legend.set_title("")

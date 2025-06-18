@@ -170,9 +170,8 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         ax2_pos = ax2.get_position()
         ax_legend_width = 0.03  # Width of the legend
         ax_legend_gap = 0.1    # Gap between ax2 and ax_legend
-        #ax_legend = fig.add_axes([ax2_pos.x1 +0.02, ax2_pos.y0, ax_legend_width, ax2_pos.height])
-        if plot_type != "ugrid_9":
-            ax_legend = fig.add_axes([ax2_pos.x1 +0.02, ax2_pos.y0, ax_legend_width, ax2_pos.height])
+        ax_legend = fig.add_axes([ax2_pos.x1 +0.02, ax2_pos.y0, ax_legend_width, ax2_pos.height])
+
 
 
         ##MAIN PLOTTER
@@ -257,35 +256,6 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                 arrow_color='white',  # Options: color string, or 'magnitude' to color by speed
                 min_speed=0.05       # Hide very weak currents (adjust based on your data range)
             )
-        elif plot_type == "ugrid_9":
-            splitt = plot_type.split("_")
-            if int(splitt[1]) == int(region):
-                dir_enabled = False
-                if '%' in dap_url:
-                    use_url = dap_url.split('%', 1)[1]
-                    first_varib = dap_variable.split('%', 1)[0]
-                    variable = first_varib.split("/", 1)[1] if "/" in first_varib else None
-                    dir_enabled = True
-                else:
-                    # do something else
-                    use_url = layer_map_data.composite_layer_id
-                    variable = dap_variable.split("/", 1)[1] if "/" in dap_variable else None
-
-                Plotter.plot_ugrid_mesh(
-                    ax2=ax2,
-                    url=use_url,
-                    target_time=time,
-                    variable_name="hs",
-                    min_color_plot=min_color_plot,
-                    max_color_plot=max_color_plot,
-                    steps=steps,
-                    unit=units,
-                    title=title,
-                    is_direction=dir_enabled, # False if you don't want arrows
-                    get_custom_colormap=Plotter.get_custom_colormap, # your function here
-                    extract_from_dap_ugrid=Plotter.extract_from_dap_ugrid, # your function here
-                    west_bound=west_bound
-                )
 
 
         #ADD LOGO AND FOOTER
