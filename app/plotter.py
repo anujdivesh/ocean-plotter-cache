@@ -1445,8 +1445,8 @@ class Plotter:
             _, _, _, hs_dir, _ = extract_from_dap_ugrid(url, target_time, 'dirm')
         else:
             hs_dir = None
-
-        fcmap = os.path.join(os.path.abspath('.'), 'Hs_colormap.dat')
+        fcmap = Path(__file__).parent / "Hs_colormap.dat"
+        #fcmap = os.path.join(os.path.abspath('.'), 'Hs_colormap.dat')
         colors = np.loadtxt(fcmap)
         colors = np.hstack((colors, np.ones((len(colors[:, 1]), 1))))
         cmap = mpl.colors.ListedColormap(colors)
