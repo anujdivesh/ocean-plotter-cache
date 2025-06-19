@@ -118,7 +118,7 @@ def read_root():
 
 #MAPS FOR OCEAN PORTAL
 @ocean_router.get("/getMap")
-async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True):
+async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True,token: str = 'null'):
     # Generate unique filename based on parameters
     params_hash = hashlib.md5(f"{region}_{layer_map}_{time}".encode()).hexdigest()
     filename = "plot_%s_%s_%s.png" % (region,layer_map,params_hash)
@@ -138,7 +138,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         resolution = "l"
         #####PARAMETER#####
 
-        layer_map_data = Plotter.fetch_wms_layer_data(layer_id)
+        layer_map_data = Plotter.fetch_wms_layer_data(layer_id,token)
 
         #REMOVE DEMO
         #time = Plotter.demo_time(layer_map_data)

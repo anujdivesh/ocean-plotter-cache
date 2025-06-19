@@ -37,11 +37,17 @@ plt.switch_backend('Agg')
 
 class Plotter:
     @staticmethod
-    def fetch_wms_layer_data(layer_id):
+    def fetch_wms_layer_data(layer_id,token):
         try:
             url_tmp = "https://ocean-middleware.spc.int/middleware/api/layer_web_map/{layerid}/"
             url = url_tmp.format(layerid=layer_id)
-            response = requests.get(url)
+            headers = {
+                'Authorization': f'Bearer {token}',
+            }
+            if token != 'null':
+                response = requests.get(url,headers=headers)
+            else:
+                response = requests.get(url)
             response.raise_for_status()  # Raise an exception for HTTP errors
             data_dict = response.json()
             
