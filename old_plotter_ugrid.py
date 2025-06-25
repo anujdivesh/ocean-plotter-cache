@@ -1540,7 +1540,7 @@ elif plot_type == "ugrid_9":
             # do something else
             use_url = layer_map_data.composite_layer_id
             variable = dap_variable.split("/", 1)[1] if "/" in dap_variable else None
-
+        use_url = use_url.replace("wms", "dodsC")
         plot_ugrid_mesh(
             ax2=ax2,
             url=use_url,

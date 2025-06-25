@@ -35,7 +35,7 @@ import gzip
 from typing import Dict
 import logger
 from fastapi.middleware.gzip import GZipMiddleware
-
+import xarray as xr
 app = FastAPI(
     docs_url="/plotter/docs",
     redoc_url="/plotter/redoc",
@@ -270,7 +270,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                     # do something else
                     use_url = layer_map_data.composite_layer_id
                     variable = dap_variable.split("/", 1)[1] if "/" in dap_variable else None
-                use_url = use_url.replace("wms", "dodsC")
+
                 Plotter.plot_ugrid_mesh(
                     ax2=ax2,
                     url=use_url,
@@ -866,6 +866,102 @@ async def cache_middleware(request: Request, call_next):
     
     return await call_next(request)
 
+import math
+url = "https://ocean-thredds01.spc.int/thredds/dodsC/POP/model/regional/noaa/hindcast/monthly/sst_anomalies/oisst-avhrr-v02r01.202501.nc"
+ds = xr.open_dataset(url)
+timestamp = np.datetime64("2025-01-16T12:00:00.000Z")
+anom_data = ds['anom'].sel(time=timestamp, method='nearest').squeeze()
+# Remap longitudes for Leaflet compatibility
+anom_data = anom_data.assign_coords(
+    lon=(((anom_data.lon + 180) % 360) - 180)
+).sortby('lon')
 
+lat = anom_data['lat'].values
+lon = anom_data['lon'].values
 
+vmin, vmax = -3, 3
+TILE_SIZE = 256
+
+app = FastAPI()
+
+def tile_bounds(x, y, z):
+    n = 2 ** z
+    lon_min = x / n * 360.0 - 180.0
+    lon_max = (x + 1) / n * 360.0 - 180.0
+    lat_rad_min = math.atan(math.sinh(math.pi * (1 - 2 * y / n)))
+    lat_rad_max = math.atan(math.sinh(math.pi * (1 - 2 * (y + 1) / n)))
+    lat_min = math.degrees(lat_rad_max)
+    lat_max = math.degrees(lat_rad_min)
+    return lon_min, lat_min, lon_max, lat_max
+
+def make_empty_tile():
+    empty = np.zeros((TILE_SIZE, TILE_SIZE, 4), dtype=np.uint8)
+    buf = io.BytesIO()
+    plt.imsave(buf, empty, format="png")
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/png")
+
+@ocean_router.get("/tiles/{z}/{x}/{y}.png")
+def serve_tile(z: int, x: int, y: int):
+    try:
+        lon_min, lat_min, lon_max, lat_max = tile_bounds(x, y, z)
+        # Check if requested bounds overlap data
+        data_lon_min = float(anom_data.lon.min())
+        data_lon_max = float(anom_data.lon.max())
+        data_lat_min = float(anom_data.lat.min())
+        data_lat_max = float(anom_data.lat.max())
+        # If tile is completely outside data, return empty
+        if lon_max < data_lon_min or lon_min > data_lon_max or \
+           lat_max < data_lat_min or lat_min > data_lat_max:
+            return make_empty_tile()
+        # Restrict the selection to the intersection
+        sel_lon_min = max(lon_min, data_lon_min)
+        sel_lon_max = min(lon_max, data_lon_max)
+        sel_lat_min = max(lat_min, data_lat_min)
+        sel_lat_max = min(lat_max, data_lat_max)
+        if lat[0] > lat[-1]:
+            lat_slice = slice(sel_lat_max, sel_lat_min)
+            tile_lats = np.linspace(sel_lat_max, sel_lat_min, TILE_SIZE)
+        else:
+            lat_slice = slice(sel_lat_min, sel_lat_max)
+            tile_lats = np.linspace(sel_lat_min, sel_lat_max, TILE_SIZE)
+        tile_lons = np.linspace(sel_lon_min, sel_lon_max, TILE_SIZE)
+        data_tile = anom_data.sel(
+            lon=slice(sel_lon_min, sel_lon_max),
+            lat=lat_slice
+        ).squeeze()
+        if data_tile.size == 0 or np.all(np.isnan(data_tile)):
+            return make_empty_tile()
+        data_interp = data_tile.interp(lon=tile_lons, lat=tile_lats).squeeze()
+        anom = data_interp.values
+        if np.all(np.isnan(anom)):
+            return make_empty_tile()
+        # Render to tile coordinates (full tile, even if partial data)
+        fig, ax = plt.subplots(figsize=(TILE_SIZE/100, TILE_SIZE/100), dpi=100)
+        ax.set_axis_off()
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        cmap = plt.get_cmap('bwr').copy()
+        cmap.set_bad(color=(0,0,0,0))
+        masked = np.ma.masked_invalid(anom)
+        # Always draw over full requested tile (not data extent), so all tiles are always filled
+        ax.imshow(
+            masked, origin='lower',
+            extent=[sel_lon_min, sel_lon_max, sel_lat_min, sel_lat_max],
+            cmap=cmap, vmin=vmin, vmax=vmax
+        )
+        # Set the axis to cover the whole tile, even if partial data is present
+        ax.set_xlim(lon_min, lon_max)
+        ax.set_ylim(lat_min, lat_max)
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", bbox_inches=None, pad_inches=0, transparent=True)
+        plt.close(fig)
+        buf.seek(0)
+        return StreamingResponse(buf, media_type="image/png")
+    except Exception as e:
+        print(f"Tile error at z={z} x={x} y={y}: {e}")
+        return make_empty_tile()
 app.include_router(ocean_router)
