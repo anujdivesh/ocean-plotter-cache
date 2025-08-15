@@ -182,10 +182,12 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
         elif plot_type == "contourf_nozero":
+            from matplotlib.ticker import FormatStrFormatter
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True)
             cs, cbar = Plotter.plot_filled_contours_no_zero(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
+            
         elif plot_type == "pcolormesh":
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True)
             cs, cbar = Plotter.plot_filled_pcolor(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
@@ -286,6 +288,10 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                     extract_from_dap_ugrid=Plotter.extract_from_dap_ugrid, # your function here
                     west_bound=west_bound
                 )
+        cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+        for t in cbar.ax.get_yticklabels():
+            t.set_horizontalalignment('left')
+        cbar.ax.tick_params(axis='y', pad=-1)
 
 
         #ADD LOGO AND FOOTER
