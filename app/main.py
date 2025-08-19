@@ -35,6 +35,7 @@ import gzip
 from typing import Dict
 import logger
 from fastapi.middleware.gzip import GZipMiddleware
+from matplotlib.ticker import FormatStrFormatter
 
 app = FastAPI(
     docs_url="/plotter/docs",
@@ -182,7 +183,6 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
         elif plot_type == "contourf_nozero":
-            from matplotlib.ticker import FormatStrFormatter
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True)
             cs, cbar = Plotter.plot_filled_contours_no_zero(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
