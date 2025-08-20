@@ -175,7 +175,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         if plot_type != "ugrid_9":
             ax_legend = fig.add_axes([ax2_pos.x1 +0.02, ax2_pos.y0, ax_legend_width, ax2_pos.height])
 
-
+        cbar = None
         ##MAIN PLOTTER
         if plot_type == "contourf":
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True)
@@ -288,10 +288,11 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                     extract_from_dap_ugrid=Plotter.extract_from_dap_ugrid, # your function here
                     west_bound=west_bound
                 )
-        cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
-        for t in cbar.ax.get_yticklabels():
-            t.set_horizontalalignment('left')
-        cbar.ax.tick_params(axis='y', pad=-1)
+        if cbar is not None:
+            cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+            for t in cbar.ax.get_yticklabels():
+                t.set_horizontalalignment('left')
+            cbar.ax.tick_params(axis='y', pad=-1)
 
 
         #ADD LOGO AND FOOTER
