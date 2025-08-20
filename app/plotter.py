@@ -39,7 +39,7 @@ class Plotter:
     @staticmethod
     def fetch_wms_layer_data(layer_id,token):
         try:
-            url_tmp = "https://ocean-middleware.spc.int/middleware/api/layer_web_map/{layerid}/"
+            url_tmp = "http://10.19.112.6:8000/middleware/api/layer_web_map/{layerid}/"
             url = url_tmp.format(layerid=layer_id)
             headers = {
                 'Authorization': f'Bearer {token}',
@@ -330,7 +330,7 @@ class Plotter:
     @staticmethod
     def getCountryData(country_id):
         # Fetch bounding box data from API
-        region_url_prefix = "https://ocean-middleware.spc.int/middleware/api/country/"
+        region_url_prefix = "http://10.19.112.6:8000/middleware/api/country/"
         api_url = "%s%s/" % (region_url_prefix,str(country_id))
         response = requests.get(api_url)
         west_bound, east_bound, south_bound, north_bound,country_name = "", "", "","",""
@@ -348,7 +348,7 @@ class Plotter:
 
     @staticmethod
     def getBBox(country_id):
-        region_url_prefix = "https://ocean-middleware.spc.int/middleware/api/country/"
+        region_url_prefix = "http://10.19.112.6:8000/middleware/api/country/"
         # Fetch bounding box data from API
         api_url = "%s%s/" % (region_url_prefix,str(country_id))
         response = requests.get(api_url)
