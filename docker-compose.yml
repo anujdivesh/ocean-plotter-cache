@@ -16,7 +16,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./app/static:/app/static
-      - /mnt/data/ocean_portal/datasets:/mnt/data/ocean_portal/datasets
+      - /mnt/data/ocean_portal/datasets:/app/datasets
     environment:
       - RELOAD=${RELOAD:-false}
       - WORKERS=${WORKERS:-1} #6
