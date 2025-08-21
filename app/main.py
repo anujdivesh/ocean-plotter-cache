@@ -140,8 +140,11 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         #####PARAMETER#####
 
         layer_map_data = Plotter.fetch_wms_layer_data(layer_id,token)
+        #TEST
+        #info = Plotter.get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')
+        #PROD
+        info = Plotter.get_layer_dataset_download_info(str(layer_id),time,'/mnt/data/ocean_portal/datasets')
 
-        info = Plotter.get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')
         check_local = True
         local_file_name = ""
         if info == 0:
