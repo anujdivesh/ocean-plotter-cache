@@ -141,6 +141,15 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
 
         layer_map_data = Plotter.fetch_wms_layer_data(layer_id,token)
 
+        info = Plotter.get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')
+        check_local = True
+        local_file_name = ""
+        if info == 0:
+            check_local = False
+        else:
+            local_file_name = "%s/%s" % (info['path'], info['file_name'])
+            check_local = True
+
         #REMOVE DEMO
         #time = Plotter.demo_time(layer_map_data)
         #REMOVE DEMO
@@ -178,32 +187,38 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         cbar = None
         ##MAIN PLOTTER
         if plot_type == "contourf":
-            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True)
+            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
             cs, cbar = Plotter.plot_filled_contours(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
         elif plot_type == "contourf_nozero":
-            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True)
+            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
             cs, cbar = Plotter.plot_filled_contours_no_zero(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
             
         elif plot_type == "pcolormesh":
-            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True)
+            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
             cs, cbar = Plotter.plot_filled_pcolor(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
         elif plot_type == "wave_with_dir":
             wave_height_varib, wave_dir_varib = dap_variable.split(',')
-            lon, lat, wave_height = Plotter.getfromDAP(dap_url, time, wave_height_varib, adjust_lon=True)
-            _, _, wave_dir = Plotter.getfromDAP(dap_url, time, wave_dir_varib, adjust_lon=True)
+            lon, lat, wave_height = Plotter.getfromDAP(dap_url, time, wave_height_varib, adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
+            _, _, wave_dir = Plotter.getfromDAP(dap_url, time, wave_dir_varib, adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
             step = 10
             if int(region) == 1:
                 step = 30
             cs, q, cbar = Plotter.plot_wave_field(ax2, ax_legend, m, lon, lat, wave_height, wave_dir,\
                                     min_color_plot, max_color_plot, steps,region, step, cmap_name=cmap_name, units=units)
         elif plot_type == "discrete":
-            lons, lats, bleaching_data = Plotter.getfromDAP(dap_url, time, dap_variable, adjust_lon=True)
+            lons, lats, bleaching_data = Plotter.getfromDAP(dap_url, time, dap_variable, adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
             splitBy_ = discrete.split("_")
             if len(splitBy_) > 1:
                 colors = splitBy_[0]
@@ -224,22 +239,28 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                     cmap_colors=color_arr, colorbar_labels=label_arr)
 
         elif plot_type == "levels_pcolor":
-            lons, lats, chl_data = Plotter.getfromDAP(dap_url, time, dap_variable, adjust_lon=True)
+            lons, lats, chl_data = Plotter.getfromDAP(dap_url, time, dap_variable, adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
             Plotter.plot_levels_pcolor(ax2, ax_legend, lons, lats, chl_data,cmap_name, units=units,levels=levels)
 
         elif plot_type == "levels_contourf":
-            lons, lats, chl_data = Plotter.getfromDAP(dap_url, time, dap_variable, adjust_lon=True)
+            lons, lats, chl_data = Plotter.getfromDAP(dap_url, time, dap_variable, adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
             Plotter.plot_levels_contour(ax2, ax_legend, lons, lats, chl_data,cmap_name, units=units,levels=levels,)
 
         elif plot_type == "climate":
             split_varib = dap_variable.split(",")
-            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, split_varib[0],adjust_lon=True)
+            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, split_varib[0],adjust_lon=True,\
+            local_path=check_local, local_path_str=local_file_name)
             cs, cbar = Plotter.plot_climatology(dap_url,time,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
-                min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
+                min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,
+                local_path=check_local, local_path_str=local_file_name
             )
         elif plot_type == "currents":
-            lon, lat, uo = Plotter.getfromDAP(dap_url, time, 'uo', adjust_lon=True)
-            _, _, vo = Plotter.getfromDAP(dap_url, time, 'vo', adjust_lon=True)
+            lon, lat, uo = Plotter.getfromDAP(dap_url, time, 'uo', adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
+            _, _, vo = Plotter.getfromDAP(dap_url, time, 'vo', adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
             pcm, quiv, cbar = Plotter.plot_current_magnitude(
                 ax=ax2,
                 ax_legend=ax_legend,
@@ -300,6 +321,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             footer_text=config.footer_text,dataset_text=dataset_text)
 
         #PLOT EEZ
+        """
         Plotter.getEEZ(ax2,eez_url,m)
         if short_name == "PAC":
             m.drawcoastlines(linewidth=0.3)
@@ -307,6 +329,20 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             m.drawcountries()
         else:
             Plotter.plot_coastline_from_geoserver(ax2,m,short_name)
+        """
+        if short_name == "PAC": 
+            Plotter.getEEZ(ax2,m,local_path="./vector/final_eez_country/PAC_EEZ_v3.zip")
+        else:
+            fname = "%s/%s.zip" % ("./vector/final_eez_country",short_name)
+            Plotter.getEEZ(ax2,m,local_path=fname)
+
+        if short_name == "PAC":
+            m.drawcoastlines(linewidth=0.3)
+            m.fillcontinents(color='#A9A9A9', lake_color='white')
+            m.drawcountries()
+        else:
+            file_name = '%s/%s_coastline.zip' %("./vector/Individual_coastline",short_name)
+            Plotter.plot_coastline_from_geoserver(ax2,m,file_name)
 
         #Plotter.plot_coastline_from_geoserver(ax2,m,short_name)
         Plotter.plot_city_names(ax2,m,short_name, Path(__file__).parent.parent / "app" / "config" / "pac_names.json")

@@ -122,11 +122,9 @@ def getfromDAP(url, target_time, variable_name, adjust_lon=False):
         raise RuntimeError(f"Error accessing OpenDAP data: {str(e)}")
 """
 
+
 def getfromDAP(url, target_time, variable_name, adjust_lon=False, local_path=False, local_path_str=None):
-    """
-    Attempts to load data from a local NetCDF file if local_path is True, otherwise from the provided OpenDAP URL.
-    If the dataset does not have a `time` attribute, simply gets the first slice of the variable.
-    """
+    
     try:
         # Choose data source
         data_source = local_path_str if local_path and local_path_str else url
@@ -193,17 +191,9 @@ def getfromDAP(url, target_time, variable_name, adjust_lon=False, local_path=Fal
             raise RuntimeError(f"Error accessing local NetCDF data: {str(e)}")
         else:
             raise RuntimeError(f"Error accessing OpenDAP data: {str(e)}")
+
+"""
 def plot_coastline_from_geoserver(ax,m,country, style='polygon'):
-    """
-    Plot coastline polygons from GeoServer WFS with proper dateline handling
-    
-    Parameters:
-    - ax: matplotlib axis object
-    - geoserver_url: Base URL of GeoServer (e.g., 'http://localhost:8080/geoserver')
-    - layer_name: Name of the coastline layer (e.g., 'coastline')
-    - workspace: GeoServer workspace (default: 'naturalearth')
-    - style: 'polygon' for filled polygons or 'line' for just boundaries
-    """
     try:
         # Construct WFS request URL
         wfs_url = "https://opmgeoserver.gem.spc.int/geoserver/spc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=spc:"+country+"_coastline&srsName=EPSG:4326&outputFormat=application/json"
@@ -251,6 +241,62 @@ def plot_coastline_from_geoserver(ax,m,country, style='polygon'):
         
     except Exception as e:
         print(f"Error plotting coastline from GeoServer: {str(e)}")
+"""
+def plot_coastline_from_local(ax, m, filepath, style='polygon', simplify_tolerance=0.01):
+    """
+    Plot coastline polygons from a local shapefile/GeoJSON/zip with proper dateline handling.
+
+    Parameters:
+    - ax: matplotlib axis object
+    - m: Basemap object (for coordinate transformation)
+    - filepath: path to local shapefile, GeoJSON, or zipped shapefile
+    - style: 'polygon' for filled polygons or 'line' for just boundaries
+    - simplify_tolerance: tolerance for geometry simplification
+    """
+    try:
+        # Detect zipped shapefile
+        if filepath.endswith('.zip'):
+            gdf = gpd.read_file(f"zip://{filepath}")
+        else:
+            gdf = gpd.read_file(filepath)
+
+        # Ensure correct CRS (EPSG:4326)
+        if gdf.crs is None:
+            gdf = gdf.set_crs('EPSG:4326', allow_override=True)
+        else:
+            gdf = gdf.to_crs('EPSG:4326')
+
+        # Simplify complex geometries if needed
+        if simplify_tolerance and simplify_tolerance > 0:
+            gdf['geometry'] = gdf['geometry'].simplify(tolerance=simplify_tolerance)
+
+        # Plot with dateline handling
+        for geom in gdf.geometry:
+            if not geom.is_valid:
+                geom = geom.buffer(0)  # Fix invalid geometries
+
+            if geom.geom_type == 'Polygon':
+                geoms = [geom]
+            elif geom.geom_type == 'MultiPolygon':
+                geoms = list(geom.geoms)
+            else:
+                continue
+
+            for poly in geoms:
+                # Original and shifted version to handle dateline
+                original = gpd.GeoSeries([poly], crs='EPSG:4326')
+                shifted = original.translate(xoff=360)
+                combined = pd.concat([original, shifted])
+
+                for part in combined:
+                    x, y = m(part.exterior.coords.xy[0], part.exterior.coords.xy[1])
+                    if style == 'polygon':
+                        ax.fill(x, y, color='#A9A9A9', ec='black', lw=0.5, zorder=2)
+                    else:
+                        ax.plot(x, y, color='black', lw=0.5, zorder=2)
+
+    except Exception as e:
+        print(f"Error plotting coastline from local file: {str(e)}")
 
 def plot_coastline_from_shapefile(ax, shapefile_path):
     """
@@ -408,7 +454,7 @@ def getBBox(country_id):
         print(f"Failed to retrieve bounding box data. Status code: {response.status_code}")
     
     return west_bound, east_bound, south_bound, north_bound, country_name,short_name
-
+"""
 def getEEZ(ax,geojson_url):
     geojson_response = requests.get(geojson_url)
 
@@ -438,6 +484,85 @@ def getEEZ(ax,geojson_url):
     else:
         print("Failed to retrieve the GeoJSON data.")
 
+"""
+def getEEZ(ax, m, local_path=None, geojson_url=None, color='black', linewidth=1, linestyle='--'):
+    """
+    Plot EEZ boundaries from local file if available, otherwise from GeoServer URL.
+
+    Parameters:
+    - ax: matplotlib axis object
+    - m: Basemap object (for coordinate transformation)
+    - local_path: Path to local shapefile or GeoJSON (.shp, .geojson, or .zip containing shapefile)
+    - geojson_url: URL to fetch GeoJSON from GeoServer
+    - color, linewidth, linestyle: plot properties
+    """
+    gdf = None
+
+    # Try reading from local file first, if provided
+    if local_path is not None and os.path.exists(local_path):
+        try:
+            # Support for zipped shapefiles
+            if local_path.endswith('.zip'):
+                gdf = gpd.read_file(f"zip://{local_path}")
+            else:
+                gdf = gpd.read_file(local_path)
+        except Exception as e:
+            print(f"Failed to read local file {local_path}: {e}")
+
+    # If no local data or failed, try GeoServer
+    if gdf is None and geojson_url is not None:
+        try:
+            geojson_response = requests.get(geojson_url)
+            if geojson_response.status_code == 200:
+                geojson_data = geojson_response.json()
+                gdf = gpd.GeoDataFrame.from_features(geojson_data['features'])
+            else:
+                print(f"Failed to retrieve GeoJSON from {geojson_url}")
+        except Exception as e:
+            print(f"Error fetching GeoJSON from {geojson_url}: {e}")
+
+    # If we still have no data, abort
+    if gdf is None:
+        print("No EEZ data available to plot.")
+        return
+
+    # Ensure correct CRS
+    if gdf.crs is None:
+        gdf = gdf.set_crs('EPSG:4326', allow_override=True)
+    else:
+        gdf = gdf.to_crs('EPSG:4326')
+
+    # Plot boundaries, handling LineString, MultiLineString, Polygon, MultiPolygon and dateline wrap
+    for geom in gdf.geometry:
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+        # LineString
+        if geom.geom_type == 'LineString':
+            x, y = m(*geom.xy)
+            x = np.array(x)
+            x = np.where(x < 0, x + 360, x)
+            ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
+        # MultiLineString
+        elif geom.geom_type == 'MultiLineString':
+            for line in geom.geoms:
+                x, y = m(*line.xy)
+                x = np.array(x)
+                x = np.where(x < 0, x + 360, x)
+                ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
+        # Polygon
+        elif geom.geom_type == 'Polygon':
+            x, y = m(*geom.exterior.xy)
+            x = np.array(x)
+            x = np.where(x < 0, x + 360, x)
+            ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
+        # MultiPolygon
+        elif geom.geom_type == 'MultiPolygon':
+            for poly in geom.geoms:
+                x, y = m(*poly.exterior.xy)
+                x = np.array(x)
+                x = np.where(x < 0, x + 360, x)
+                ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
+        # Other geometry types will be ignored
 def cm2inch(*tupl):
     inch = 2.54
     if type(tupl[0]) == tuple:
@@ -632,62 +757,88 @@ def plot_filled_contours(ax, ax_legend, lon, lat, data,
     
     return cs, cbar
 
-def plot_climatology(dap_url, time, ax, ax_legend, lon, lat, data, 
-                        min_color_plot, max_color_plot, steps,
-                        cmap_name='RdBu_r', units='(°C)'):
-    # Create fixed levels for contours
+def _mask_sst(data, units_hint=""):
+    """
+    Mask SST-like data to avoid coastline artifacts:
+    - Mask NaN/Inf
+    - Mask unrealistic SST values (<= -3 or >= 45 °C)
+    - Mask exact zeros (common land sentinel in some local files)
+    """
+    # Ensure masked array and float dtype
+    ma = np.ma.masked_invalid(np.asarray(data, dtype=np.float32))
+    ma = np.ma.masked_where((ma <= -3.0) | (ma >= 45.0), ma)
+    ma = np.ma.masked_where(np.isclose(ma, 0.0), ma)
+    return ma
+
+def plot_climatology(
+    dap_url, time, ax, ax_legend, lon, lat, data, 
+    min_color_plot, max_color_plot, steps,
+    cmap_name='RdBu_r', units='(°C)', local_path=False, local_path_str=None
+):
+    """
+    Plot SST and climatology, including 29°C contours for both.
+    """
+    # Color levels
     levels = np.arange(min_color_plot, max_color_plot, steps)
-    
-    # Plot filled contours with fixed levels
+
+    # Mask SST to prevent coastlines from appearing as isolines
+    data_masked = _mask_sst(data, units_hint=units)
+
+    # Filled contours
     cs = ax.contourf(
-        lon, lat, data,
+        lon, lat, data_masked,
         levels=levels,
         cmap=cmap_name,
-        extend='both'  # Adds arrows if data exceeds min/max
+        extend='both',
+        corner_mask=True
     )
-    contour_29 = ax.contour(
-        lon, lat, data,
+
+    # SST 29°C contour
+    ax.contour(
+        lon, lat, data_masked,
         levels=[29],
         colors='purple',
         linewidths=2,
         linestyles='solid',
-        zorder=5,
-        label=f'(SST))'
+        zorder=6,
+        corner_mask=True
     )
-    clim_lon, clim_lat, sst_clim = getfromDAP(dap_url, time, "sst_clim",adjust_lon=True)
-    
-    contour_clim = ax.contour(
-            clim_lon, clim_lat, sst_clim,
+
+    # Try plotting climatology 29°C contour
+    try:
+        clim_lon, clim_lat, sst_clim = getfromDAP(
+            dap_url, time, "sst_clim", adjust_lon=True,
+            local_path=local_path, local_path_str=local_path_str
+        )
+        sst_clim_masked = _mask_sst(sst_clim, units_hint=units)
+        cont = ax.contour(
+            clim_lon, clim_lat, sst_clim_masked,
             levels=[29],
             colors='green',
             linewidths=2,
             linestyles='solid',
-            zorder=6,
-            label='Climatology'
+            zorder=7,
+            corner_mask=True
         )
-    # Optional: Add labels to the contour line
-    #ax.clabel(contour_29, inline=True, fontsize=8, fmt='%1.0f')
-    legend_elements = [
-        Line2D([0], [0], color='purple', lw=1, label=f'SST'),
-        Line2D([0], [0], color='green', lw=1, label='Climatology')
-    ]
+        # Optional: warn if not drawn at all
+        if len(cont.allsegs[0][0]) == 0:
+            print("Warning: No green climatology contour drawn at 29°C (level not present in data).")
+    except Exception as e:
+        print(f"Climatology 29°C contour not plotted: {e}")
 
-    # Add legend
+    # Legend
+    legend_elements = [
+        Line2D([0], [0], color='purple', lw=2, label='SST 29°C'),
+        Line2D([0], [0], color='green', lw=2, label='Climatology 29°C')
+    ]
     ax.legend(handles=legend_elements, loc='upper right', fontsize=6)
 
-    # Add colorbar with matching ticks
+    # Colorbar
     cbar = plt.colorbar(cs, cax=ax_legend)
-    cbar.set_ticks(levels)  # Same ticks as contour levels
+    cbar.set_ticks(levels)
     cbar.ax.tick_params(labelsize=7)
-    cbar.set_label(
-        units,
-        fontsize=6,
-        rotation=0,
-        va='center',
-        ha='left',
-        labelpad=1
-    )
-    
+    cbar.set_label(units, fontsize=6, rotation=0, va='center', ha='left', labelpad=1)
+
     return cs, cbar
 
 def plot_filled_pcolor(ax, ax_legend, lon, lat, data, 
@@ -1505,12 +1656,19 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
     infix = data["download_file_infix"]
     suffix = data["download_file_suffix"]
     local_directory_path = data["local_directory_path"]
+    if layer_id == "26": 
+        infix = "%Y%m_%Y%m"
+    elif layer_id == "36":
+        infix = "%Y%m_%Y%m"
+        suffix = ".nc"
+    elif layer_id == "37":
+        infix = "decile.%Y%m"
+        suffix = ".nc"
+    elif layer_id == "35" or layer_id == "39":
+        infix = "%Y%m"
+        suffix = ".nc"
 
-    # Replace {root-dir} if root_dir is supplied
-    if root_dir:
-        path = local_directory_path.replace("{root-dir}", root_dir)
-    else:
-        path = local_directory_path
+    
 
     # Prepare file name
     if "%" in infix:
@@ -1531,6 +1689,36 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
         elif not time:
             raise ValueError("Time must be provided for infix formatting.")
         # Parse time string like "2025-10-16T12:00:00Z"
+        elif layer_id == "36": 
+            first_fmt, last_fmt = infix.split("_", 1)
+            # Parse the base date
+            # Parse the base date
+            dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+            # First day of current month
+            first_day = dt.replace(day=1)
+
+            # Calculate the first day of the month two months ahead
+            if first_day.month > 10:
+                # December or November
+                year = first_day.year + 1
+                month = (first_day.month + 2) % 12
+                if month == 0: month = 12
+            else:
+                year = first_day.year
+                month = first_day.month + 2
+            next2_month = first_day.replace(year=year, month=month, day=1)
+            # Last day is the last day of that month (go to next month, subtract 1 day)
+            if month == 12:
+                month3 = 1
+                year3 = year + 1
+            else:
+                month3 = month + 1
+                year3 = year
+            month3_first = next2_month.replace(year=year3, month=month3, day=1)
+            last_day = month3_first - timedelta(days=1)
+
+            # Format
+            infix_formatted = f"{first_day.strftime(first_fmt)}_{last_day.strftime(last_fmt)}"
         else:
             dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
             infix_formatted = dt.strftime(infix)
@@ -1545,6 +1733,45 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
         file_name += '.nc'
     if layer_id == "16":
         file_name = 'latest.nc'
+    if layer_id == "19":
+        file_name = 'latest_merged.nc'
+    if layer_id == "47":
+        file_name = 'sst_trend.nc'
+    if layer_id == "41":
+        def get_weekly_filename(time_str):
+            """
+            Given a time string, returns the AQUA_MODIS 8-day composite filename
+            based on the custom start date 2025-05-25.
+            """
+            # Reference start and end date from your first dataset
+            ref_start = datetime(2025, 5, 25)
+            dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ")
+            days_since_ref = (dt - ref_start).days
+            period_index = days_since_ref // 8
+            # Handle dates before the reference period
+            if days_since_ref < 0:
+                raise ValueError("Date is before the first available dataset period.")
+            start_dt = ref_start + timedelta(days=period_index * 8)
+            end_dt = start_dt + timedelta(days=7)
+            fname = f"AQUA_MODIS.{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.L3m.8D.CHL.chlor_a.4km.NRT.nc"
+            return fname
+
+        file_name = get_weekly_filename(time)
+    if layer_id == "26":
+        local_directory_path = "{root-dir}/model/regional/copernicus/hindcast/monthly/ssh"
+    if layer_id == "35" or layer_id == "39":
+        local_directory_path = "{root-dir}/model/regional/noaa/hindcast/monthly/sst_anomalies"
+    if layer_id == "36":
+        local_directory_path = "{root-dir}/model/regional/noaa/hindcast/3monthly/sst_anomalies"
+    if layer_id == "37":
+        local_directory_path = "{root-dir}/model/regional/noaa/hindcast/decile/sst_anomalies"
+    if layer_id == "47":
+        local_directory_path = "{root-dir}/model/regional/noaa/hindcast/trend"
+    # Replace {root-dir} if root_dir is supplied
+    if root_dir:
+        path = local_directory_path.replace("{root-dir}", root_dir)
+    else:
+        path = local_directory_path
 
     return {
         "path": path,
@@ -1556,7 +1783,7 @@ config = get_config_variables()
 
 #####PARAMETER#####
 region = 1
-layer_id = 5
+layer_id = 18
 #time= add_z_if_needed("2024-10-01T00:00:00Z")
 resolution = "l"
 #####PARAMETER#####
@@ -1565,7 +1792,9 @@ layer_map_data = fetch_wms_layer_data(layer_id)
 
 #REMOVE DEMO
 time = demo_time(layer_map_data)
-time = "2025-05-25T00:00:00Z"
+#time = "2025-05-01T00:00:00Z"
+time = "2025-09-16T00:00:00Z"
+#time = "2025-08-05T00:00:00Z"
 #REMOVE DEMO
 ##TRY TO GET DATASET
 info = get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')
@@ -1579,6 +1808,7 @@ else:
 
 print(check_local)
 print(local_file_name)
+#sys.exit()
 ##
 
 #####MAIN#####
@@ -1680,7 +1910,8 @@ elif plot_type == "climate":
     lon, lat, data_extract = getfromDAP(dap_url, time, split_varib[0],adjust_lon=True,\
     local_path=check_local, local_path_str=local_file_name)
     cs, cbar = plot_climatology(dap_url,time,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
-        min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
+        min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,
+        local_path=check_local, local_path_str=local_file_name
     )
 elif plot_type == "currents":
     lon, lat, uo = getfromDAP(dap_url, time, 'uo', adjust_lon=True,\
@@ -1742,13 +1973,20 @@ add_logo_and_footer(fig=fig, ax=ax, ax2=ax2, ax2_pos=ax2_pos, region=1, copyrigh
 
 print("Plotting EEZ and Coastline...")
 #PLOT EEZ
-getEEZ(ax2,eez_url)
+#getEEZ(ax2,eez_url)
+if short_name == "PAC": 
+    getEEZ(ax2,m,local_path="./vector/final_eez_country/PAC_EEZ_v3.zip")
+else:
+    fname = "%s/%s.zip" % ("./vector/final_eez_country",short_name)
+    getEEZ(ax2,m,local_path=fname)
+
 if short_name == "PAC":
     m.drawcoastlines(linewidth=0.3)
     m.fillcontinents(color='#A9A9A9', lake_color='white')
     m.drawcountries()
 else:
-    plot_coastline_from_geoserver(ax2,m,short_name)
+    file_name = '%s/%s_coastline.zip' %("./vector/Individual_coastline",short_name)
+    plot_coastline_from_local(ax2,m,file_name)
 #plot_coastline_from_geoserver(ax2)
 #plot_coastline_from_shapefile(ax2,'config/shapefile/coastline/Pacific_Coastlines_openstreet_polygon.shp')
 plot_city_names(ax2,m,short_name)

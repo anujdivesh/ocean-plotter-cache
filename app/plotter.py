@@ -63,148 +63,131 @@ class Plotter:
             return None
 
     @staticmethod
-    def getfromDAP(url, target_time, variable_name, adjust_lon=False):
+    def getfromDAP(url, target_time, variable_name, adjust_lon=False, local_path=False, local_path_str=None):
+        
         try:
-            # Open dataset with SSL verification
-            with xr.open_dataset(url, engine='netcdf4', mask_and_scale=True, decode_cf=True) as ds:
-                
-                # Get available times (handle bytes if needed)
-                if isinstance(ds.time.values[0], bytes):
-                    time_str = [t.decode('utf-8') for t in ds.time.values]
-                    time_dt = np.array([datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ") for t in time_str])
-                else:
-                    # Convert numpy datetime64 to datetime objects if needed
-                    time_dt = [pd.to_datetime(t).to_pydatetime() for t in ds.time.values]
-                
-                # Convert target time to datetime object
-                target_dt = datetime.strptime(target_time, "%Y-%m-%dT%H:%M:%SZ")
-                
-                # Find closest time by comparing timestamps
-                time_index = np.argmin([abs((t - target_dt).total_seconds()) for t in time_dt])
-                
+            # Choose data source
+            data_source = local_path_str if local_path and local_path_str else url
+
+            with xr.open_dataset(data_source, engine='netcdf4', mask_and_scale=True, decode_cf=True) as ds:
                 # Extract variable data
                 if variable_name not in ds.variables:
                     available_vars = list(ds.variables.keys())
                     raise ValueError(f"Variable '{variable_name}' not found. Available variables: {available_vars}")
-                
-                data = ds[variable_name].isel(time=time_index)
-                
+
+                # Check if "time" dimension exists
+                if "time" in ds.dims or "time" in ds.coords:
+                    # Get available times (handle bytes if needed)
+                    if isinstance(ds.time.values[0], bytes):
+                        time_str = [t.decode('utf-8') for t in ds.time.values]
+                        time_dt = np.array([datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ") for t in time_str])
+                    else:
+                        time_dt = [pd.to_datetime(t).to_pydatetime() for t in ds.time.values]
+
+                    # Convert target time to datetime object
+                    target_dt = datetime.strptime(target_time, "%Y-%m-%dT%H:%M:%SZ")
+                    # Find closest time index
+                    time_index = np.argmin([abs((t - target_dt).total_seconds()) for t in time_dt])
+
+                    data = ds[variable_name].isel(time=time_index)
+                else:
+                    # No "time" in dims or coords, just take the first slice
+                    data = ds[variable_name]
+                    # If variable has more than 2 dimensions, select the first "frame" along the first axis
+                    if len(data.shape) > 2:
+                        data = data.isel({data.dims[0]: 0})
+
                 # If variable has 3 dimensions (e.g., depth), select first depth level
                 if len(data.dims) == 3:
                     data = data.isel({data.dims[0]: 0})  # Select first index of first dimension
-                
+
                 # Determine coordinate names
                 coord_names = {
                     'lon': ['lon', 'longitude', 'x', 'X'],
                     'lat': ['lat', 'latitude', 'y', 'Y']
                 }
-                
-                # Find longitude coordinate
-                lon_name = None
-                for possible_name in coord_names['lon']:
-                    if possible_name in ds.coords:
-                        lon_name = possible_name
-                        break
+                lon_name = next((n for n in coord_names['lon'] if n in ds.coords), None)
+                lat_name = next((n for n in coord_names['lat'] if n in ds.coords), None)
                 if lon_name is None:
                     raise ValueError("Could not identify longitude coordinate variable")
-                
-                # Find latitude coordinate
-                lat_name = None
-                for possible_name in coord_names['lat']:
-                    if possible_name in ds.coords:
-                        lat_name = possible_name
-                        break
                 if lat_name is None:
                     raise ValueError("Could not identify latitude coordinate variable")
-                
+
                 # Get coordinates
                 lon = ds[lon_name].values
                 lat = ds[lat_name].values
-                
+
                 # Adjust longitude if requested (for 180° crossing)
                 if adjust_lon:
-                    if np.any(lon < 0):  # Only adjust if there are negative longitudes
+                    if np.any(lon < 0):
                         lon = np.where(lon < 0, lon + 360, lon)
-                
+
                 # Extract and mask data values
                 data_extract = np.ma.masked_invalid(data.values.squeeze())
-                
                 return lon, lat, data_extract
-                
+
         except Exception as e:
-            raise RuntimeError(f"Error accessing OpenDAP data: {str(e)}")
+            if local_path:
+                raise RuntimeError(f"Error accessing local NetCDF data: {str(e)}")
+            else:
+                raise RuntimeError(f"Error accessing OpenDAP data: {str(e)}")
 
     @staticmethod
-    def plot_coastline_from_geoserver(ax,m,country, style='polygon'):
+    def plot_coastline_from_geoserver(ax, m, filepath, style='polygon', simplify_tolerance=0.01):
         """
-        Plot coastline polygons from GeoServer WFS with proper dateline handling
-        
+        Plot coastline polygons from a local shapefile/GeoJSON/zip with proper dateline handling.
+
         Parameters:
         - ax: matplotlib axis object
-        - geoserver_url: Base URL of GeoServer (e.g., 'http://localhost:8080/geoserver')
-        - layer_name: Name of the coastline layer (e.g., 'coastline')
-        - workspace: GeoServer workspace (default: 'naturalearth')
+        - m: Basemap object (for coordinate transformation)
+        - filepath: path to local shapefile, GeoJSON, or zipped shapefile
         - style: 'polygon' for filled polygons or 'line' for just boundaries
+        - simplify_tolerance: tolerance for geometry simplification
         """
         try:
-            wfs_url = f"https://opmgeoserver.gem.spc.int/geoserver/spc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=spc:{country}_coastline&srsName=EPSG:4326&outputFormat=application/json"
+            # Detect zipped shapefile
+            if filepath.endswith('.zip'):
+                gdf = gpd.read_file(f"zip://{filepath}")
+            else:
+                gdf = gpd.read_file(filepath)
 
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-
-            # Option 1: Using requests first then geopandas
-            response = requests.get(wfs_url, headers=headers)
-            gdf = gpd.read_file(response.content)
-
-            """
-            # Construct WFS request URL
-            wfs_url = "https://opmgeoserver.gem.spc.int/geoserver/spc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=spc:"+country+"_coastline&srsName=EPSG:4326&outputFormat=application/json"
-            print(wfs_url)
-            # Read data directly from GeoServer
-            gdf = gpd.read_file(wfs_url)
-            """
-            
             # Ensure correct CRS (EPSG:4326)
             if gdf.crs is None:
                 gdf = gdf.set_crs('EPSG:4326', allow_override=True)
             else:
                 gdf = gdf.to_crs('EPSG:4326')
-            
-            # Simplify complex geometries (adjust tolerance as needed)
-            gdf['geometry'] = gdf['geometry'].simplify(tolerance=0.01)
-            
+
+            # Simplify complex geometries if needed
+            if simplify_tolerance and simplify_tolerance > 0:
+                gdf['geometry'] = gdf['geometry'].simplify(tolerance=simplify_tolerance)
+
             # Plot with dateline handling
             for geom in gdf.geometry:
                 if not geom.is_valid:
                     geom = geom.buffer(0)  # Fix invalid geometries
-                    
-                if geom.geom_type in ['Polygon', 'MultiPolygon']:
-                    # Create two versions - original and shifted by 360°
-                    original = gpd.GeoSeries([geom], crs='EPSG:4326')
+
+                if geom.geom_type == 'Polygon':
+                    geoms = [geom]
+                elif geom.geom_type == 'MultiPolygon':
+                    geoms = list(geom.geoms)
+                else:
+                    continue
+
+                for poly in geoms:
+                    # Original and shifted version to handle dateline
+                    original = gpd.GeoSeries([poly], crs='EPSG:4326')
                     shifted = original.translate(xoff=360)
-                    
-                    # Combine both versions
                     combined = pd.concat([original, shifted])
-                    
-                    # Plot each geometry
-                    for poly in combined:
-                        if poly.geom_type == 'Polygon':
-                            x, y = m(poly.exterior.coords.xy[0], poly.exterior.coords.xy[1])
-                            if style == 'polygon':
-                                ax.fill(x, y, color='#A9A9A9', ec='black', lw=0.5, zorder=2)
-                            else:
-                                ax.plot(x, y, color='black', lw=0.5, zorder=2)
-                        elif poly.geom_type == 'MultiPolygon':
-                            for part in poly.geoms:
-                                x, y = m(part.exterior.coords.xy[0], part.exterior.coords.xy[1])
-                                if style == 'polygon':
-                                    ax.fill(x, y, color='#A9A9A9', ec='black', lw=0.5, zorder=2)
-                                else:
-                                    ax.plot(x, y, color='black', lw=0.5, zorder=2)
-            
+
+                    for part in combined:
+                        x, y = m(part.exterior.coords.xy[0], part.exterior.coords.xy[1])
+                        if style == 'polygon':
+                            ax.fill(x, y, color='#A9A9A9', ec='black', lw=0.5, zorder=2)
+                        else:
+                            ax.plot(x, y, color='black', lw=0.5, zorder=2)
+
         except Exception as e:
-            print(f"Error plotting coastline from GeoServer: {str(e)}")
+            print(f"Error plotting coastline from local file: {str(e)}")
 
     @staticmethod
     def plot_coastline_from_shapefile(ax, shapefile_path):
@@ -368,34 +351,84 @@ class Plotter:
         return west_bound, east_bound, south_bound, north_bound, country_name,short_name
 
     @staticmethod
-    def getEEZ(ax,geojson_url,m):
-        geojson_response = requests.get(geojson_url)
+    def getEEZ(ax, m, local_path=None, geojson_url=None, color='black', linewidth=1, linestyle='--'):
+        """
+        Plot EEZ boundaries from local file if available, otherwise from GeoServer URL.
 
-        if geojson_response.status_code == 200:
-            # Load GeoJSON data using geopandas
-            geojson_data = geojson_response.json()
-            gdf = gpd.GeoDataFrame.from_features(geojson_data['features'])
+        Parameters:
+        - ax: matplotlib axis object
+        - m: Basemap object (for coordinate transformation)
+        - local_path: Path to local shapefile or GeoJSON (.shp, .geojson, or .zip containing shapefile)
+        - geojson_url: URL to fetch GeoJSON from GeoServer
+        - color, linewidth, linestyle: plot properties
+        """
+        gdf = None
 
-            # Ensure the GeoDataFrame is in the same CRS as the map (EPSG:4326)
+        # Try reading from local file first, if provided
+        if local_path is not None and os.path.exists(local_path):
+            try:
+                # Support for zipped shapefiles
+                if local_path.endswith('.zip'):
+                    gdf = gpd.read_file(f"zip://{local_path}")
+                else:
+                    gdf = gpd.read_file(local_path)
+            except Exception as e:
+                print(f"Failed to read local file {local_path}: {e}")
+
+        # If no local data or failed, try GeoServer
+        if gdf is None and geojson_url is not None:
+            try:
+                geojson_response = requests.get(geojson_url)
+                if geojson_response.status_code == 200:
+                    geojson_data = geojson_response.json()
+                    gdf = gpd.GeoDataFrame.from_features(geojson_data['features'])
+                else:
+                    print(f"Failed to retrieve GeoJSON from {geojson_url}")
+            except Exception as e:
+                print(f"Error fetching GeoJSON from {geojson_url}: {e}")
+
+        # If we still have no data, abort
+        if gdf is None:
+            print("No EEZ data available to plot.")
+            return
+
+        # Ensure correct CRS
+        if gdf.crs is None:
             gdf = gdf.set_crs('EPSG:4326', allow_override=True)
-
-            # Convert GeoJSON coordinates to Basemap projection coordinates
-            for geom in gdf.geometry:
-                if geom.is_valid:  # Check if the geometry is valid
-                    # For each geometry, extract the boundary (line) and convert to Basemap projection
-                    for geom_line in geom.geoms:  # In case the geometry is MultiPolygon or similar
-                        # Convert coordinates to Basemap projection
-                        x, y = m(geom_line.xy[0], geom_line.xy[1])  # Convert coordinates to Basemap projection
-                        
-                        # Shift the longitudes to avoid the 180° cutoff
-                        x = np.array(x)  # Ensure x is a numpy array for element-wise operations
-                        x = np.where(x < 0, x + 360, x)  # For longitudes < 0 (e.g., -170°), shift to +180°
-                        
-                        # Plot the boundary line
-                        ax.plot(x, y, marker=None, color='black', linewidth=1,linestyle='--')  # Plot the boundary line
-
         else:
-            print("Failed to retrieve the GeoJSON data.")
+            gdf = gdf.to_crs('EPSG:4326')
+
+        # Plot boundaries, handling LineString, MultiLineString, Polygon, MultiPolygon and dateline wrap
+        for geom in gdf.geometry:
+            if not geom.is_valid:
+                geom = geom.buffer(0)
+            # LineString
+            if geom.geom_type == 'LineString':
+                x, y = m(*geom.xy)
+                x = np.array(x)
+                x = np.where(x < 0, x + 360, x)
+                ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
+            # MultiLineString
+            elif geom.geom_type == 'MultiLineString':
+                for line in geom.geoms:
+                    x, y = m(*line.xy)
+                    x = np.array(x)
+                    x = np.where(x < 0, x + 360, x)
+                    ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
+            # Polygon
+            elif geom.geom_type == 'Polygon':
+                x, y = m(*geom.exterior.xy)
+                x = np.array(x)
+                x = np.where(x < 0, x + 360, x)
+                ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
+            # MultiPolygon
+            elif geom.geom_type == 'MultiPolygon':
+                for poly in geom.geoms:
+                    x, y = m(*poly.exterior.xy)
+                    x = np.array(x)
+                    x = np.where(x < 0, x + 360, x)
+                    ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
+            # Other geometry types will be ignored
 
     @staticmethod
     def cm2inch(*tupl):
@@ -606,62 +639,79 @@ class Plotter:
         return cs, cbar
 
     @staticmethod
+    def _mask_sst(data, units_hint=""):
+        """
+        Mask SST-like data to avoid coastline artifacts:
+        - Mask NaN/Inf
+        - Mask unrealistic SST values (<= -3 or >= 45 °C)
+        - Mask exact zeros (common land sentinel in some local files)
+        """
+        ma = np.ma.masked_invalid(data)
+        ma = np.ma.masked_where((ma <= -3.0) | (ma >= 45.0), ma)
+        ma = np.ma.masked_where(np.isclose(ma, 0.0), ma)
+        return ma
+    @staticmethod
     def plot_climatology(dap_url, time, ax, ax_legend, lon, lat, data, 
-                            min_color_plot, max_color_plot, steps,
-                            cmap_name='RdBu_r', units='(°C)'):
-        # Create fixed levels for contours
+                        min_color_plot, max_color_plot, steps,
+                        cmap_name='RdBu_r', units='(°C)', local_path=False, local_path_str=None):
+        # Color levels
         levels = np.arange(min_color_plot, max_color_plot, steps)
-        
-        # Plot filled contours with fixed levels
+
+        # Mask SST to prevent coastlines from appearing as isolines
+        data_masked = Plotter._mask_sst(data, units_hint=units)
+
+        # Filled contours
         cs = ax.contourf(
-            lon, lat, data,
+            lon, lat, data_masked,
             levels=levels,
             cmap=cmap_name,
-            extend='both'  # Adds arrows if data exceeds min/max
+            extend='both',
+            corner_mask=True
         )
-        contour_29 = ax.contour(
-            lon, lat, data,
+
+        
+        ax.contour(
+            lon, lat, data_masked,
             levels=[29],
             colors='purple',
             linewidths=2,
             linestyles='solid',
-            zorder=5,
-            label=f'(SST))'
+            zorder=6,
+            corner_mask=True
         )
-        clim_lon, clim_lat, sst_clim = Plotter.getfromDAP(dap_url, time, "sst_clim",adjust_lon=True)
-        
-        contour_clim = ax.contour(
-                clim_lon, clim_lat, sst_clim,
+
+
+        try:
+            clim_lon, clim_lat, sst_clim = Plotter.getfromDAP(
+                dap_url, time, "sst_clim", adjust_lon=True,
+                local_path=local_path, local_path_str=local_path_str
+            )
+            sst_clim_masked = Plotter._mask_sst(sst_clim, units_hint=units)
+            ax.contour(
+                clim_lon, clim_lat, sst_clim_masked,
                 levels=[29],
                 colors='green',
                 linewidths=2,
                 linestyles='solid',
-                zorder=6,
-                label='Climatology'
+                zorder=7,
+                corner_mask=True
             )
-        # Optional: Add labels to the contour line
-        #ax.clabel(contour_29, inline=True, fontsize=8, fmt='%1.0f')
-        legend_elements = [
-            Line2D([0], [0], color='purple', lw=1, label=f'SST'),
-            Line2D([0], [0], color='green', lw=1, label='Climatology')
-        ]
+        except Exception:
+            pass  # silently skip if clim not available
 
-        # Add legend
+        # Legend
+        legend_elements = [
+            Line2D([0], [0], color='purple', lw=1, label='SST 29°C'),
+            Line2D([0], [0], color='green', lw=1, label='Climatology 29°C')
+        ]
         ax.legend(handles=legend_elements, loc='upper right', fontsize=6)
 
-        # Add colorbar with matching ticks
+        # Colorbar
         cbar = plt.colorbar(cs, cax=ax_legend)
-        cbar.set_ticks(levels)  # Same ticks as contour levels
+        cbar.set_ticks(levels)
         cbar.ax.tick_params(labelsize=7)
-        cbar.set_label(
-            units,
-            fontsize=6,
-            rotation=0,
-            va='center',
-            ha='left',
-            labelpad=1
-        )
-        
+        cbar.set_label(units, fontsize=6, rotation=0, va='center', ha='left', labelpad=1)
+
         return cs, cbar
 
     @staticmethod
@@ -1442,6 +1492,164 @@ class Plotter:
             norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
             return cmap, norm, bounds
         return cmap
+    
+    @staticmethod
+    def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_filename='layer_dataset_mapper.json'):
+        """
+        Given a layer_id, optional time, and optional root_dir, reads the mapper file for dataset_id,
+        queries the dataset API, and returns:
+            - path: local_directory_path (with {root-dir} replaced if root_dir is given)
+            - file_name: download_file_prefix + download_file_infix + download_file_suffix
+        If download_file_infix contains % (strftime), uses 'time' to fill it in.
+        If layer_id does not exist in the mapping, returns 0 and does not execute further.
+        """
+        # Convert layer_id to string for mapping lookup
+        layer_id_str = str(layer_id)
+        
+        # Read the mapping file from the same directory as this script
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        mapper_path = os.path.join(current_dir, mapper_filename)
+        
+        with open(mapper_path, 'r') as f:
+            mapping = json.load(f)
+        
+        # Get the dataset_id for the given layer_id
+        dataset_id = mapping.get(layer_id_str)
+        if not dataset_id:
+            return 0  # Immediately return 0 and DO NOT execute further
+        
+        # Query the API for this dataset_id
+        url = f"https://ocean-middleware.spc.int/middleware/api/dataset/{dataset_id}/?format=json"
+        resp = requests.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Extract the required fields
+        prefix = data["download_file_prefix"]
+        infix = data["download_file_infix"]
+        suffix = data["download_file_suffix"]
+        local_directory_path = data["local_directory_path"]
+        if layer_id == "26": 
+            infix = "%Y%m_%Y%m"
+        elif layer_id == "36":
+            infix = "%Y%m_%Y%m"
+            suffix = ".nc"
+        elif layer_id == "37":
+            infix = "decile.%Y%m"
+            suffix = ".nc"
+        elif layer_id == "35" or layer_id == "39":
+            infix = "%Y%m"
+            suffix = ".nc"
+
+        
+
+        # Prepare file name
+        if "%" in infix:
+            if "_" in infix and "AQUA" in infix:
+                first_fmt, last_fmt = infix.split("_", 1)
+                # Parse the base date
+                dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+                # First day of month
+                first_day = dt.replace(day=1)
+                # Last day of month: go to next month, subtract 1 day
+                if dt.month == 12:
+                    next_month = dt.replace(year=dt.year + 1, month=1, day=1)
+                else:
+                    next_month = dt.replace(month=dt.month + 1, day=1)
+                last_day = next_month - timedelta(days=1)
+                # Format
+                infix_formatted = f"{first_day.strftime(first_fmt)}_{last_day.strftime(last_fmt)}"
+            elif not time:
+                raise ValueError("Time must be provided for infix formatting.")
+            # Parse time string like "2025-10-16T12:00:00Z"
+            elif layer_id == "36": 
+                first_fmt, last_fmt = infix.split("_", 1)
+                # Parse the base date
+                # Parse the base date
+                dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+                # First day of current month
+                first_day = dt.replace(day=1)
+
+                # Calculate the first day of the month two months ahead
+                if first_day.month > 10:
+                    # December or November
+                    year = first_day.year + 1
+                    month = (first_day.month + 2) % 12
+                    if month == 0: month = 12
+                else:
+                    year = first_day.year
+                    month = first_day.month + 2
+                next2_month = first_day.replace(year=year, month=month, day=1)
+                # Last day is the last day of that month (go to next month, subtract 1 day)
+                if month == 12:
+                    month3 = 1
+                    year3 = year + 1
+                else:
+                    month3 = month + 1
+                    year3 = year
+                month3_first = next2_month.replace(year=year3, month=month3, day=1)
+                last_day = month3_first - timedelta(days=1)
+
+                # Format
+                infix_formatted = f"{first_day.strftime(first_fmt)}_{last_day.strftime(last_fmt)}"
+            else:
+                dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+                infix_formatted = dt.strftime(infix)
+        elif "none" in infix:
+            infix_formatted = ""
+            suffix = ""
+        else:
+            infix_formatted = infix
+
+        file_name = f"{prefix}{infix_formatted}{suffix}"
+        if not file_name.endswith('.nc'):
+            file_name += '.nc'
+        if layer_id == "16":
+            file_name = 'latest.nc'
+        if layer_id == "19":
+            file_name = 'latest_merged.nc'
+        if layer_id == "47":
+            file_name = 'sst_trend.nc'
+        if layer_id == "41":
+            def get_weekly_filename(time_str):
+                """
+                Given a time string, returns the AQUA_MODIS 8-day composite filename
+                based on the custom start date 2025-05-25.
+                """
+                # Reference start and end date from your first dataset
+                ref_start = datetime(2025, 5, 25)
+                dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ")
+                days_since_ref = (dt - ref_start).days
+                period_index = days_since_ref // 8
+                # Handle dates before the reference period
+                if days_since_ref < 0:
+                    raise ValueError("Date is before the first available dataset period.")
+                start_dt = ref_start + timedelta(days=period_index * 8)
+                end_dt = start_dt + timedelta(days=7)
+                fname = f"AQUA_MODIS.{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.L3m.8D.CHL.chlor_a.4km.NRT.nc"
+                return fname
+
+            file_name = get_weekly_filename(time)
+        if layer_id == "26":
+            local_directory_path = "{root-dir}/model/regional/copernicus/hindcast/monthly/ssh"
+        if layer_id == "35" or layer_id == "39":
+            local_directory_path = "{root-dir}/model/regional/noaa/hindcast/monthly/sst_anomalies"
+        if layer_id == "36":
+            local_directory_path = "{root-dir}/model/regional/noaa/hindcast/3monthly/sst_anomalies"
+        if layer_id == "37":
+            local_directory_path = "{root-dir}/model/regional/noaa/hindcast/decile/sst_anomalies"
+        if layer_id == "47":
+            local_directory_path = "{root-dir}/model/regional/noaa/hindcast/trend"
+        # Replace {root-dir} if root_dir is supplied
+        if root_dir:
+            path = local_directory_path.replace("{root-dir}", root_dir)
+        else:
+            path = local_directory_path
+
+        return {
+            "path": path,
+            "file_name": file_name
+        }
 
     @staticmethod
     def plot_ugrid_mesh(ax2,url,target_time,variable_name,min_color_plot,max_color_plot,steps,unit,title,is_direction,get_custom_colormap,extract_from_dap_ugrid,west_bound):
