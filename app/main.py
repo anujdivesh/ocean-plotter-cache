@@ -312,7 +312,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                     extract_from_dap_ugrid=Plotter.extract_from_dap_ugrid, # your function here
                     west_bound=west_bound
                 )
-        if cbar is not None:
+        if cbar is not None and plot_type != "discrete":
             cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
             for t in cbar.ax.get_yticklabels():
                 t.set_horizontalalignment('left')
