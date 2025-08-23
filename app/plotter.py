@@ -1606,6 +1606,8 @@ class Plotter:
             file_name += '.nc'
         if layer_id == "16":
             file_name = 'latest.nc'
+        if layer_id == "2" or layer_id =="10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
+            file_name = 'latest_merged.nc'
         if layer_id == "19":
             file_name = 'latest_merged.nc'
         if layer_id == "47":
@@ -1640,6 +1642,8 @@ class Plotter:
             local_directory_path = "{root-dir}/model/regional/noaa/hindcast/decile/sst_anomalies"
         if layer_id == "47":
             local_directory_path = "{root-dir}/model/regional/noaa/hindcast/trend"
+        if layer_id == "2" or layer_id == "10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
+            local_directory_path = "{root-dir}/model/regional/bom/forecast/hourly/wavewatch3_latest"
         # Replace {root-dir} if root_dir is supplied
         if root_dir:
             path = local_directory_path.replace("{root-dir}", root_dir)

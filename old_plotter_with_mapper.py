@@ -1733,6 +1733,8 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
         file_name += '.nc'
     if layer_id == "16":
         file_name = 'latest.nc'
+    if layer_id == "2" or layer_id =="10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
+        file_name = 'latest_merged.nc'
     if layer_id == "19":
         file_name = 'latest_merged.nc'
     if layer_id == "47":
@@ -1767,6 +1769,8 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
         local_directory_path = "{root-dir}/model/regional/noaa/hindcast/decile/sst_anomalies"
     if layer_id == "47":
         local_directory_path = "{root-dir}/model/regional/noaa/hindcast/trend"
+    if layer_id == "2" or layer_id == "10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
+        local_directory_path = "{root-dir}/model/regional/bom/forecast/hourly/wavewatch3_latest"
     # Replace {root-dir} if root_dir is supplied
     if root_dir:
         path = local_directory_path.replace("{root-dir}", root_dir)
@@ -1783,7 +1787,7 @@ config = get_config_variables()
 
 #####PARAMETER#####
 region = 1
-layer_id = 18
+layer_id = 14
 #time= add_z_if_needed("2024-10-01T00:00:00Z")
 resolution = "l"
 #####PARAMETER#####
@@ -1793,8 +1797,9 @@ layer_map_data = fetch_wms_layer_data(layer_id)
 #REMOVE DEMO
 time = demo_time(layer_map_data)
 #time = "2025-05-01T00:00:00Z"
-time = "2025-09-16T00:00:00Z"
+#time = "2025-09-16T00:00:00Z"
 #time = "2025-08-05T00:00:00Z"
+time = "2025-08-23T00:00:00Z"
 #REMOVE DEMO
 ##TRY TO GET DATASET
 info = get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')
