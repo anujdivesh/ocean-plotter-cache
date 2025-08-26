@@ -28,7 +28,7 @@ from dateutil.relativedelta import relativedelta
 from scipy.interpolate import NearestNDInterpolator
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from matplotlib.ticker import FormatStrFormatter
 
 #####FUNCTIONS#####
 def fetch_wms_layer_data(layer_id):
@@ -902,7 +902,7 @@ def plot_wave_field(ax, ax_legend, m, lon, lat, wave_height, wave_dir,
     cbar = plt.colorbar(cs, cax=ax_legend)
     cbar.set_label(
         units,
-        fontsize=8,
+        fontsize=5,
         rotation=0,
         va='center',
         ha='left',
@@ -926,7 +926,7 @@ def plot_wave_field(ax, ax_legend, m, lon, lat, wave_height, wave_dir,
                      '', labelpos='E',
                      coordinates='axes', fontproperties={'size': 9},
                      labelsep=0.05, labelcolor='black')
-    cbar.ax.tick_params(labelsize=6)
+    cbar.ax.tick_params(labelsize=7)
     
     return cs, q, cbar
 
@@ -1667,6 +1667,8 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
     elif layer_id == "35" or layer_id == "39":
         infix = "%Y%m"
         suffix = ".nc"
+    elif layer_id == "8":
+        infix = "%Y%m%d_%Y%m%d"
 
     
 
@@ -1739,6 +1741,21 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
         file_name = 'latest_merged.nc'
     if layer_id == "47":
         file_name = 'sst_trend.nc'
+    if layer_id == "8":
+        first_fmt, last_fmt = infix.split("_", 1)
+        # Parse the base date
+        dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+        # First day of month
+        first_day = dt.replace(day=1)
+        # Last day of month: go to next month, subtract 1 day
+        if dt.month == 12:
+            next_month = dt.replace(year=dt.year + 1, month=1, day=1)
+        else:
+            next_month = dt.replace(month=dt.month + 1, day=1)
+        last_day = next_month - timedelta(days=1)
+        # Format
+        infix_formatted = f"{first_day.strftime(first_fmt)}_{last_day.strftime(last_fmt)}"
+        file_name = f"AQUA_MODIS."+infix_formatted+".L3m.MO.CHL.chlor_a.4km.NRT.nc.dap.nc"
     if layer_id == "41":
         def get_weekly_filename(time_str):
             """
@@ -1787,7 +1804,7 @@ config = get_config_variables()
 
 #####PARAMETER#####
 region = 1
-layer_id = 14
+layer_id = 5
 #time= add_z_if_needed("2024-10-01T00:00:00Z")
 resolution = "l"
 #####PARAMETER#####
@@ -1799,7 +1816,8 @@ time = demo_time(layer_map_data)
 #time = "2025-05-01T00:00:00Z"
 #time = "2025-09-16T00:00:00Z"
 #time = "2025-08-05T00:00:00Z"
-time = "2025-08-23T00:00:00Z"
+#time = "2025-08-26T00:00:00Z"
+time = "2025-05-25T00:00:00Z"
 #REMOVE DEMO
 ##TRY TO GET DATASET
 info = get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')

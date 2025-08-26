@@ -316,7 +316,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
             for t in cbar.ax.get_yticklabels():
                 t.set_horizontalalignment('left')
-            cbar.ax.tick_params(axis='y', pad=-1)
+            cbar.ax.tick_params(axis='y', pad=-1, length=0)
 
 
         #ADD LOGO AND FOOTER
