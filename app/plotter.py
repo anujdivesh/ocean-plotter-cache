@@ -504,7 +504,7 @@ class Plotter:
     def get_title(layer_map_data,time):
         new_name = []
         week = False
-        date = datetime.strptime(add_z_if_needed(time), "%Y-%m-%dT%H:%M:%SZ")
+        date = datetime.strptime(Plotter.add_z_if_needed(time), "%Y-%m-%dT%H:%M:%SZ")
         date2 = date.strftime("%Y-%m-%dT%H%M%SZ")
         formatted_date = date.strftime("%-d %B %Y")
         orig_name = layer_map_data.get_map_names
