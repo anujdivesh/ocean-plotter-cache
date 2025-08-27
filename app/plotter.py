@@ -503,7 +503,7 @@ class Plotter:
     def get_title(layer_map_data,time):
         new_name = []
         week = False
-        date = datetime.strptime(Plotter.add_z_if_needed(time), "%Y-%m-%dT%H:%M:%SZ")
+        date = datetime.strptime(add_z_if_needed(time), "%Y-%m-%dT%H:%M:%SZ")
         date2 = date.strftime("%Y-%m-%dT%H%M%SZ")
         formatted_date = date.strftime("%-d %B %Y")
         orig_name = layer_map_data.get_map_names
@@ -543,12 +543,21 @@ class Plotter:
                     title_suffix = "%s : %s" % (cleaned, formatted_range)
                 else:    
                     cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '')
-                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
-                    date_str = layer_map_data.get_map_names[1]
-                    start_date = date
-                    end_date = start_date + relativedelta(months=2)
-                    formatted_range = f"{start_date.strftime('%b')} - {end_date.strftime('%b %Y')}"
-                    title_suffix = "%s : %s" % (cleaned, formatted_range)
+                    if "Seasonal" in cleaned:
+                        formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                        date_str = layer_map_data.get_map_names[1]
+                        start_date = date - relativedelta(months=1)
+                        end_date = start_date + relativedelta(months=2)
+                        formatted_range = f"{start_date.strftime('%b')} - {end_date.strftime('%b %Y')}"
+                        title_suffix = "%s : %s" % (cleaned, formatted_range)
+                    
+                    else:
+                        formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                        date_str = layer_map_data.get_map_names[1]
+                        start_date = date
+                        end_date = start_date + relativedelta(months=2)
+                        formatted_range = f"{start_date.strftime('%b')} - {end_date.strftime('%b %Y')}"
+                        title_suffix = "%s : %s" % (cleaned, formatted_range)
         weekly_split = orig_name.split('/')
         if "{8week}" in weekly_split[1]:
             name = weekly_split[1].replace("{8week}", "")
@@ -559,6 +568,123 @@ class Plotter:
             title_suffix = "%s: %s - %s" % ( weekly_split[0],formatted_date,formatted_future_date)
 
         return title_suffix, dataset_text
+
+    @staticmethod
+    def plot_filled_contours_no_zero_levels(
+            ax, ax_legend, lon, lat, data, 
+            min_color_plot=None, max_color_plot=None, steps=None,
+            cmap_name='RdBu_r', units='(°C)', levels=None, white_color=(1, 1, 1, 1)):
+
+        """
+        Draw filled contours with:
+        - Discrete colors (one color per interval)
+        - Central band across zero painted white if levels jump over 0 (e.g., ...,-30, 30,...)
+        - Diverging colors: blue for negatives, red for positives (RdBu_r)
+        - Proper handling of extend='both' via from_levels_and_colors
+
+        levels: strictly increasing sequence of boundaries (no zero is fine).
+                Example:
+                [-4, -3, -2, -1.2, -0.8, -0.4, 0.4, 0.8, 1.2, 2, 3, 4]
+                [-300, -200, -100, -60, -30, 30, 60, 100, 200, 300]
+        """
+
+        base = plt.get_cmap(cmap_name)
+
+        # If levels not provided, derive from range (excluding zero)
+        if levels is None:
+            if steps is None or min_color_plot is None or max_color_plot is None:
+                raise ValueError("Provide levels or all of min_color_plot, max_color_plot, and steps.")
+            levels = np.arange(min_color_plot, max_color_plot, steps, dtype=float)
+            levels = levels[levels != 0]
+
+        levels = np.asarray(levels, dtype=float)
+
+        # Basic validations
+        if levels.ndim != 1 or len(levels) < 2:
+            raise ValueError("levels must be a 1D array with at least two ascending values.")
+        if not np.all(np.diff(levels) > 0):
+            raise ValueError("levels must be strictly increasing.")
+
+        n_intervals = len(levels) - 1
+
+        # Detect a single “gap across zero”: levels[i] < 0 < levels[i+1]
+        cross_idxs = np.where((levels[:-1] < 0) & (levels[1:] > 0))[0]
+
+        # Build interval colors
+        interval_colors = None
+        if cross_idxs.size == 1:
+            # There is exactly one central gap across zero
+            center_idx = int(cross_idxs[0])
+            n_neg = center_idx                     # intervals fully below 0
+            n_pos = n_intervals - center_idx - 1   # intervals fully above 0
+
+            # Sample blue-ish side for negatives, red-ish for positives from RdBu_r
+            neg_samples = np.linspace(0.05, 0.45, n_neg) if n_neg > 0 else np.array([])
+            pos_samples = np.linspace(0.55, 0.95, n_pos) if n_pos > 0 else np.array([])
+
+            colors_neg = [base(v) for v in neg_samples]
+            colors_pos = [base(v) for v in pos_samples]
+
+            # Central band white
+            interval_colors = colors_neg + [white_color] + colors_pos
+
+        else:
+            # No gap across zero (all-negative or all-positive) or ambiguous.
+            # Just map all intervals to one side of the palette to avoid the neutral center.
+            all_pos = np.all(levels >= 0)
+            all_neg = np.all(levels <= 0)
+
+            if all_pos:
+                samples = np.linspace(0.55, 0.95, n_intervals)  # reds
+            elif all_neg:
+                samples = np.linspace(0.05, 0.45, n_intervals)  # blues
+            else:
+                # If ambiguous (e.g., 0 inside levels), distribute across both sides but no white band.
+                # Split at 0 index if present, otherwise fall back to full span.
+                if np.any(np.isclose(levels, 0.0)):
+                    zero_idx = int(np.where(np.isclose(levels, 0.0))[0][0])
+                    n_neg = zero_idx
+                    n_pos = n_intervals - zero_idx
+                    neg_samples = np.linspace(0.05, 0.45, n_neg) if n_neg > 0 else np.array([])
+                    pos_samples = np.linspace(0.55, 0.95, n_pos) if n_pos > 0 else np.array([])
+                    interval_colors = [base(v) for v in neg_samples] + [base(v) for v in pos_samples]
+                else:
+                    samples = np.linspace(0.05, 0.95, n_intervals)
+
+            if interval_colors is None:
+                interval_colors = [base(v) for v in samples]
+
+        # Add under/over colors since we use extend='both'
+        under_color = base(0.0)
+        over_color = base(1.0)
+        colors_list = [under_color] + interval_colors + [over_color]  # length == len(levels) + 1
+
+        # Build discrete cmap/norm with correct extend
+        cmap, norm = colors.from_levels_and_colors(levels, colors_list, extend='both')
+
+        # Plot
+        cs = ax.contourf(
+            lon, lat, data,
+            levels=levels,
+            cmap=cmap,
+            norm=norm,
+            extend='both'
+        )
+
+        # Colorbar
+        cbar = plt.colorbar(cs, cax=ax_legend)
+        cbar.set_ticks(levels)
+        cbar.set_ticklabels([str(t) for t in levels])
+        cbar.ax.tick_params(labelsize=8, pad=2, direction='out', length=6, width=1)
+        cbar.set_label(units, fontsize=8, rotation=0, va='center', ha='left', labelpad=1)
+
+        try:
+            cbar.solids.set_edgecolor("face")
+        except Exception:
+            pass
+
+        return cs, cbar
+
 
     @staticmethod
     def get_plot_config(layer_map_data):
@@ -1493,17 +1619,10 @@ class Plotter:
             return cmap, norm, bounds
         return cmap
     
-
+    """
     @staticmethod
     def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_filename='layer_dataset_mapper.json'):
-        """
-        Given a layer_id, optional time, and optional root_dir, reads the mapper file for dataset_id,
-        queries the dataset API, and returns:
-            - path: local_directory_path (with {root-dir} replaced if root_dir is given)
-            - file_name: download_file_prefix + download_file_infix + download_file_suffix
-        If download_file_infix contains % (strftime), uses 'time' to fill it in.
-        If layer_id does not exist in the mapping, returns 0 and does not execute further.
-        """
+
         # Convert layer_id to string for mapping lookup
         layer_id_str = str(layer_id)
         
@@ -1672,6 +1791,186 @@ class Plotter:
             "path": path,
             "file_name": file_name
         }
+    """
+    @staticmethod
+    def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_filename='layer_dataset_mapper.json'):
+        """
+        Given a layer_id, optional time, and optional root_dir, reads the mapper file for dataset_id,
+        queries the dataset API, and returns:
+            - path: local_directory_path (with {root-dir} replaced if root_dir is given)
+            - file_name: download_file_prefix + download_file_infix + download_file_suffix
+        If download_file_infix contains % (strftime), uses 'time' to fill it in.
+        If layer_id does not exist in the mapping, returns 0 and does not execute further.
+        """
+        # Convert layer_id to string for mapping lookup
+        layer_id_str = str(layer_id)
+        
+        # Read the mapping file from the same directory as this script
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        mapper_path = os.path.join(current_dir, mapper_filename)
+        
+        with open(mapper_path, 'r') as f:
+            mapping = json.load(f)
+        
+        # Get the dataset_id for the given layer_id
+        dataset_id = mapping.get(layer_id_str)
+        if not dataset_id:
+            return 0  # Immediately return 0 and DO NOT execute further
+        
+        # Query the API for this dataset_id
+        url = f"https://ocean-middleware.spc.int/middleware/api/dataset/{dataset_id}/?format=json"
+        resp = requests.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Extract the required fields
+        prefix = data["download_file_prefix"]
+        infix = data["download_file_infix"]
+        suffix = data["download_file_suffix"]
+        local_directory_path = data["local_directory_path"]
+        if layer_id == "26": 
+            infix = "%Y%m_%Y%m"
+        elif layer_id == "36":
+            infix = "%Y%m_%Y%m"
+            suffix = ".nc"
+        elif layer_id == "37":
+            infix = "decile.%Y%m"
+            suffix = ".nc"
+        elif layer_id == "35" or layer_id == "39":
+            infix = "%Y%m"
+            suffix = ".nc"
+        elif layer_id == "8":
+            infix = "%Y%m%d_%Y%m%d"
+
+        
+
+        # Prepare file name
+        if "%" in infix:
+            if "_" in infix and "AQUA" in infix:
+                first_fmt, last_fmt = infix.split("_", 1)
+                # Parse the base date
+                dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+                # First day of month
+                first_day = dt.replace(day=1)
+                # Last day of month: go to next month, subtract 1 day
+                if dt.month == 12:
+                    next_month = dt.replace(year=dt.year + 1, month=1, day=1)
+                else:
+                    next_month = dt.replace(month=dt.month + 1, day=1)
+                last_day = next_month - timedelta(days=1)
+                # Format
+                infix_formatted = f"{first_day.strftime(first_fmt)}_{last_day.strftime(last_fmt)}"
+            elif not time:
+                raise ValueError("Time must be provided for infix formatting.")
+            # Parse time string like "2025-10-16T12:00:00Z"
+            elif layer_id == "36": 
+                first_fmt, last_fmt = infix.split("_", 1)
+                # Parse the base date
+                # Parse the base date
+                dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+                # First day of current month
+                first_day = dt.replace(day=1)
+
+                # Calculate the first day of the month two months ahead
+                if first_day.month > 10:
+                    # December or November
+                    year = first_day.year + 1
+                    month = (first_day.month + 2) % 12
+                    if month == 0: month = 12
+                else:
+                    year = first_day.year
+                    month = first_day.month + 2
+                next2_month = first_day.replace(year=year, month=month, day=1)
+                # Last day is the last day of that month (go to next month, subtract 1 day)
+                if month == 12:
+                    month3 = 1
+                    year3 = year + 1
+                else:
+                    month3 = month + 1
+                    year3 = year
+                month3_first = next2_month.replace(year=year3, month=month3, day=1)
+                last_day = month3_first - timedelta(days=1)
+
+                # Format
+                infix_formatted = f"{first_day.strftime(first_fmt)}_{last_day.strftime(last_fmt)}"
+            else:
+                dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+                infix_formatted = dt.strftime(infix)
+        elif "none" in infix:
+            infix_formatted = ""
+            suffix = ""
+        else:
+            infix_formatted = infix
+
+        file_name = f"{prefix}{infix_formatted}{suffix}"
+        if not file_name.endswith('.nc'):
+            file_name += '.nc'
+        if layer_id == "16" or layer_id == "6":
+            file_name = 'latest.nc'
+        if layer_id == "2" or layer_id =="10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
+            file_name = 'latest_merged.nc'
+        if layer_id == "19":
+            file_name = 'latest_merged.nc'
+        if layer_id == "47":
+            file_name = 'sst_trend.nc'
+        if layer_id == "8":
+            first_fmt, last_fmt = infix.split("_", 1)
+            # Parse the base date
+            dt = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
+            # First day of month
+            first_day = dt.replace(day=1)
+            # Last day of month: go to next month, subtract 1 day
+            if dt.month == 12:
+                next_month = dt.replace(year=dt.year + 1, month=1, day=1)
+            else:
+                next_month = dt.replace(month=dt.month + 1, day=1)
+            last_day = next_month - timedelta(days=1)
+            # Format
+            infix_formatted = f"{first_day.strftime(first_fmt)}_{last_day.strftime(last_fmt)}"
+            file_name = f"AQUA_MODIS."+infix_formatted+".L3m.MO.CHL.chlor_a.4km.NRT.nc.dap.nc"
+        if layer_id == "41":
+            def get_weekly_filename(time_str):
+                """
+                Given a time string, returns the AQUA_MODIS 8-day composite filename
+                based on the custom start date 2025-05-25.
+                """
+                # Reference start and end date from your first dataset
+                ref_start = datetime(2025, 5, 25)
+                dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ")
+                days_since_ref = (dt - ref_start).days
+                period_index = days_since_ref // 8
+                # Handle dates before the reference period
+                if days_since_ref < 0:
+                    raise ValueError("Date is before the first available dataset period.")
+                start_dt = ref_start + timedelta(days=period_index * 8)
+                end_dt = start_dt + timedelta(days=7)
+                fname = f"AQUA_MODIS.{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.L3m.8D.CHL.chlor_a.4km.NRT.nc"
+                return fname
+
+            file_name = get_weekly_filename(time)
+        if layer_id == "26":
+            local_directory_path = "{root-dir}/model/regional/copernicus/hindcast/monthly/ssh"
+        if layer_id == "35" or layer_id == "39":
+            local_directory_path = "{root-dir}/model/regional/noaa/hindcast/monthly/sst_anomalies"
+        if layer_id == "36":
+            local_directory_path = "{root-dir}/model/regional/noaa/hindcast/3monthly/sst_anomalies"
+        if layer_id == "37":
+            local_directory_path = "{root-dir}/model/regional/noaa/hindcast/decile/sst_anomalies"
+        if layer_id == "47":
+            local_directory_path = "{root-dir}/model/regional/noaa/hindcast/trend"
+        if layer_id == "2" or layer_id == "10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
+            local_directory_path = "{root-dir}/model/regional/bom/forecast/hourly/wavewatch3_latest"
+        # Replace {root-dir} if root_dir is supplied
+        if root_dir:
+            path = local_directory_path.replace("{root-dir}", root_dir)
+        else:
+            path = local_directory_path
+
+        return {
+            "path": path,
+            "file_name": file_name
+        }
+
 
     @staticmethod
     def plot_ugrid_mesh(ax2,url,target_time,variable_name,min_color_plot,max_color_plot,steps,unit,title,is_direction,get_custom_colormap,extract_from_dap_ugrid,west_bound):

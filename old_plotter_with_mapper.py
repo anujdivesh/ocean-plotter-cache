@@ -29,6 +29,7 @@ from scipy.interpolate import NearestNDInterpolator
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import FormatStrFormatter
+from matplotlib import colors
 
 #####FUNCTIONS#####
 def fetch_wms_layer_data(layer_id):
@@ -665,12 +666,21 @@ def get_title(layer_map_data,time):
                 title_suffix = "%s : %s" % (cleaned, formatted_range)
             else:    
                 cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '')
-                formatted_date = date.strftime(layer_map_data.get_map_names[1])
-                date_str = layer_map_data.get_map_names[1]
-                start_date = date
-                end_date = start_date + relativedelta(months=2)
-                formatted_range = f"{start_date.strftime('%b')} - {end_date.strftime('%b %Y')}"
-                title_suffix = "%s : %s" % (cleaned, formatted_range)
+                if "Seasonal" in cleaned:
+                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                    date_str = layer_map_data.get_map_names[1]
+                    start_date = date - relativedelta(months=1)
+                    end_date = start_date + relativedelta(months=2)
+                    formatted_range = f"{start_date.strftime('%b')} - {end_date.strftime('%b %Y')}"
+                    title_suffix = "%s : %s" % (cleaned, formatted_range)
+                
+                else:
+                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                    date_str = layer_map_data.get_map_names[1]
+                    start_date = date
+                    end_date = start_date + relativedelta(months=2)
+                    formatted_range = f"{start_date.strftime('%b')} - {end_date.strftime('%b %Y')}"
+                    title_suffix = "%s : %s" % (cleaned, formatted_range)
     weekly_split = orig_name.split('/')
     if "{8week}" in weekly_split[1]:
         name = weekly_split[1].replace("{8week}", "")
@@ -700,7 +710,7 @@ def get_plot_config(layer_map_data):
 def plot_filled_contours_no_zero(ax, ax_legend, lon, lat, data, 
                         min_color_plot, max_color_plot, steps,
                         cmap_name='RdBu_r', units='(°C)'):
-
+    print('accesss')
     # Create fixed levels for contours, excluding zero
     levels = np.arange(min_color_plot, max_color_plot, steps)
     levels = levels[levels != 0]  # Remove zero level
@@ -727,6 +737,179 @@ def plot_filled_contours_no_zero(ax, ax_legend, lon, lat, data,
     )
     
     return cs, cbar
+"""
+def plot_filled_contours_no_zero_levels(
+        ax, ax_legend, lon, lat, data, 
+        min_color_plot=None, max_color_plot=None, steps=None,
+        cmap_name='RdBu_r', units='(°C)',levels=[]):
+
+    # Your custom boundaries (no zero), with a central white band [-0.4, 0.4]
+    #levels = np.array([-4, -3, -2, -1.2, -0.8, -0.4, 0.4, 0.8, 1.2, 2, 3, 4], dtype=float)
+
+    base = plt.get_cmap(cmap_name)
+
+    # Locate central interval [-0.4, 0.4]
+    center_idx_arr = np.where(np.isclose(levels[:-1], -0.4) & np.isclose(levels[1:], 0.4))[0]
+    if center_idx_arr.size == 0:
+        raise ValueError("Expected a central interval of [-0.4, 0.4] in levels.")
+    center_idx = int(center_idx_arr[0])
+
+    n_intervals = len(levels) - 1
+    n_neg = center_idx                   # intervals below -0.4
+    n_pos = n_intervals - center_idx - 1 # intervals above 0.4
+
+    # Sample distinct regions of RdBu_r: blue side for negatives, red side for positives
+    neg_samples = np.linspace(0.05, 0.45, n_neg) if n_neg > 0 else np.array([])
+    pos_samples = np.linspace(0.55, 0.95, n_pos) if n_pos > 0 else np.array([])
+
+    interval_colors = [base(v) for v in neg_samples] + [(1, 1, 1, 1)] + [base(v) for v in pos_samples]
+
+    # Add required under/over colors for extend='both'
+    under_color = base(0.0)  # very blue
+    over_color  = base(1.0)  # very red
+    colors_list = [under_color] + interval_colors + [over_color]  # length = len(levels) + 1
+
+    # Build discrete cmap/norm with correct extend
+    cmap, norm = colors.from_levels_and_colors(levels, colors_list, extend='both')
+
+    # Plot
+    cs = ax.contourf(
+        lon, lat, data,
+        levels=levels,
+        cmap=cmap,
+        norm=norm,
+        extend='both'
+    )
+
+    # Colorbar with boundary ticks (no 0)
+    cbar = plt.colorbar(cs, cax=ax_legend)
+    cbar.set_ticks(levels)
+    cbar.set_ticklabels([str(t) for t in levels])
+    cbar.ax.tick_params(labelsize=8, pad=2, direction='out', length=6, width=1)
+    cbar.set_label(units, fontsize=8, rotation=0, va='center', ha='left', labelpad=1)
+    try:
+        cbar.solids.set_edgecolor("face")
+    except Exception:
+        pass
+
+    return cs, cbar
+"""
+
+def plot_filled_contours_no_zero_levels(
+        ax, ax_legend, lon, lat, data, 
+        min_color_plot=None, max_color_plot=None, steps=None,
+        cmap_name='RdBu_r', units='(°C)', levels=None, white_color=(1, 1, 1, 1)):
+
+    """
+    Draw filled contours with:
+    - Discrete colors (one color per interval)
+    - Central band across zero painted white if levels jump over 0 (e.g., ...,-30, 30,...)
+    - Diverging colors: blue for negatives, red for positives (RdBu_r)
+    - Proper handling of extend='both' via from_levels_and_colors
+
+    levels: strictly increasing sequence of boundaries (no zero is fine).
+            Example:
+            [-4, -3, -2, -1.2, -0.8, -0.4, 0.4, 0.8, 1.2, 2, 3, 4]
+            [-300, -200, -100, -60, -30, 30, 60, 100, 200, 300]
+    """
+
+    base = plt.get_cmap(cmap_name)
+
+    # If levels not provided, derive from range (excluding zero)
+    if levels is None:
+        if steps is None or min_color_plot is None or max_color_plot is None:
+            raise ValueError("Provide levels or all of min_color_plot, max_color_plot, and steps.")
+        levels = np.arange(min_color_plot, max_color_plot, steps, dtype=float)
+        levels = levels[levels != 0]
+
+    levels = np.asarray(levels, dtype=float)
+
+    # Basic validations
+    if levels.ndim != 1 or len(levels) < 2:
+        raise ValueError("levels must be a 1D array with at least two ascending values.")
+    if not np.all(np.diff(levels) > 0):
+        raise ValueError("levels must be strictly increasing.")
+
+    n_intervals = len(levels) - 1
+
+    # Detect a single “gap across zero”: levels[i] < 0 < levels[i+1]
+    cross_idxs = np.where((levels[:-1] < 0) & (levels[1:] > 0))[0]
+
+    # Build interval colors
+    interval_colors = None
+    if cross_idxs.size == 1:
+        # There is exactly one central gap across zero
+        center_idx = int(cross_idxs[0])
+        n_neg = center_idx                     # intervals fully below 0
+        n_pos = n_intervals - center_idx - 1   # intervals fully above 0
+
+        # Sample blue-ish side for negatives, red-ish for positives from RdBu_r
+        neg_samples = np.linspace(0.05, 0.45, n_neg) if n_neg > 0 else np.array([])
+        pos_samples = np.linspace(0.55, 0.95, n_pos) if n_pos > 0 else np.array([])
+
+        colors_neg = [base(v) for v in neg_samples]
+        colors_pos = [base(v) for v in pos_samples]
+
+        # Central band white
+        interval_colors = colors_neg + [white_color] + colors_pos
+
+    else:
+        # No gap across zero (all-negative or all-positive) or ambiguous.
+        # Just map all intervals to one side of the palette to avoid the neutral center.
+        all_pos = np.all(levels >= 0)
+        all_neg = np.all(levels <= 0)
+
+        if all_pos:
+            samples = np.linspace(0.55, 0.95, n_intervals)  # reds
+        elif all_neg:
+            samples = np.linspace(0.05, 0.45, n_intervals)  # blues
+        else:
+            # If ambiguous (e.g., 0 inside levels), distribute across both sides but no white band.
+            # Split at 0 index if present, otherwise fall back to full span.
+            if np.any(np.isclose(levels, 0.0)):
+                zero_idx = int(np.where(np.isclose(levels, 0.0))[0][0])
+                n_neg = zero_idx
+                n_pos = n_intervals - zero_idx
+                neg_samples = np.linspace(0.05, 0.45, n_neg) if n_neg > 0 else np.array([])
+                pos_samples = np.linspace(0.55, 0.95, n_pos) if n_pos > 0 else np.array([])
+                interval_colors = [base(v) for v in neg_samples] + [base(v) for v in pos_samples]
+            else:
+                samples = np.linspace(0.05, 0.95, n_intervals)
+
+        if interval_colors is None:
+            interval_colors = [base(v) for v in samples]
+
+    # Add under/over colors since we use extend='both'
+    under_color = base(0.0)
+    over_color = base(1.0)
+    colors_list = [under_color] + interval_colors + [over_color]  # length == len(levels) + 1
+
+    # Build discrete cmap/norm with correct extend
+    cmap, norm = colors.from_levels_and_colors(levels, colors_list, extend='both')
+
+    # Plot
+    cs = ax.contourf(
+        lon, lat, data,
+        levels=levels,
+        cmap=cmap,
+        norm=norm,
+        extend='both'
+    )
+
+    # Colorbar
+    cbar = plt.colorbar(cs, cax=ax_legend)
+    cbar.set_ticks(levels)
+    cbar.set_ticklabels([str(t) for t in levels])
+    cbar.ax.tick_params(labelsize=8, pad=2, direction='out', length=6, width=1)
+    cbar.set_label(units, fontsize=8, rotation=0, va='center', ha='left', labelpad=1)
+
+    try:
+        cbar.solids.set_edgecolor("face")
+    except Exception:
+        pass
+
+    return cs, cbar
+
 
 def plot_filled_contours(ax, ax_legend, lon, lat, data, 
                         min_color_plot, max_color_plot, steps,
@@ -1733,7 +1916,7 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
     file_name = f"{prefix}{infix_formatted}{suffix}"
     if not file_name.endswith('.nc'):
         file_name += '.nc'
-    if layer_id == "16":
+    if layer_id == "16" or layer_id == "6":
         file_name = 'latest.nc'
     if layer_id == "2" or layer_id =="10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
         file_name = 'latest_merged.nc'
@@ -1804,7 +1987,7 @@ config = get_config_variables()
 
 #####PARAMETER#####
 region = 1
-layer_id = 5
+layer_id = 36
 #time= add_z_if_needed("2024-10-01T00:00:00Z")
 resolution = "l"
 #####PARAMETER#####
@@ -1813,11 +1996,15 @@ layer_map_data = fetch_wms_layer_data(layer_id)
 
 #REMOVE DEMO
 time = demo_time(layer_map_data)
-#time = "2025-05-01T00:00:00Z"
+time = "2025-05-25T00:00:00Z"
 #time = "2025-09-16T00:00:00Z"
 #time = "2025-08-05T00:00:00Z"
-#time = "2025-08-26T00:00:00Z"
-time = "2025-05-25T00:00:00Z"
+#SLA Daily
+#time = "2025-07-16T00:00:00Z"
+#SLA MONTHLY
+time = "2025-05-01T00:00:00Z"
+#BOMM
+#time = "2025-09-16T00:00:00Z"
 #REMOVE DEMO
 ##TRY TO GET DATASET
 info = get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')
@@ -1876,8 +2063,16 @@ if plot_type == "contourf":
 elif plot_type == "contourf_nozero":
     lon, lat, data_extract = getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
     local_path=check_local, local_path_str=local_file_name)
+
     cs, cbar = plot_filled_contours_no_zero(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
         min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
+    )
+elif plot_type == "contourf_nozero_levels":
+    lon, lat, data_extract = getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
+    local_path=check_local, local_path_str=local_file_name)
+
+    cs, cbar = plot_filled_contours_no_zero_levels(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
+        min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,levels=levels
     )
 elif plot_type == "pcolormesh":
     lon, lat, data_extract = getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
@@ -1990,6 +2185,37 @@ elif plot_type == "ugrid_9":
             west_bound=west_bound
         )
 
+def adjust_cbar_label_padding(cbar, min_gap=2):
+    """
+    Adjusts cbar yticklabel padding if labels are too close to the colorbar.
+
+    Parameters:
+        cbar: The colorbar object.
+        min_gap: Minimum gap in points between the colorbar and labels.
+    """
+    fig = cbar.ax.figure
+    fig.canvas.draw()  # ensure text positions are updated
+
+    # Get the axis and labels bounding boxes in display coords
+    ax_bbox = cbar.ax.get_window_extent()
+    for t in cbar.ax.get_yticklabels():
+        if not t.get_visible():
+            continue
+        t_bbox = t.get_window_extent()
+        gap = t_bbox.x0 - ax_bbox.x1  # distance in pixels from axis to label's left
+        if gap < min_gap:
+            # Convert pixels to points (1 point = 1/72 inch)
+            pad_pts = t.get_size() / 2  # or any value that makes sense
+            cbar.ax.tick_params(axis='y', pad=pad_pts)
+            fig.canvas.draw()
+            break  # adjust once for all labels
+
+if cbar is not None and plot_type != "discrete":
+    cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+    for t in cbar.ax.get_yticklabels():
+        t.set_horizontalalignment('left')
+    cbar.ax.tick_params(axis='y', pad=-1, length=0)
+    adjust_cbar_label_padding(cbar, min_gap=1)
 #ADD LOGO AND FOOTER
 add_logo_and_footer(fig=fig, ax=ax, ax2=ax2, ax2_pos=ax2_pos, region=1, copyright_text=config.copyright_text,\
     footer_text=config.footer_text,dataset_text=dataset_text)

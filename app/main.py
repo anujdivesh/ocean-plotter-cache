@@ -201,6 +201,13 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             cs, cbar = Plotter.plot_filled_contours_no_zero(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
+        elif plot_type == "contourf_nozero_levels":
+            lon, lat, data_extract = getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
+            local_path=check_local, local_path_str=local_file_name)
+
+            cs, cbar = plot_filled_contours_no_zero_levels(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
+                min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,levels=levels
+            )
             
         elif plot_type == "pcolormesh":
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
