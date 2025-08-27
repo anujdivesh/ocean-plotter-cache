@@ -1916,7 +1916,7 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
     file_name = f"{prefix}{infix_formatted}{suffix}"
     if not file_name.endswith('.nc'):
         file_name += '.nc'
-    if layer_id == "16" or layer_id == "6":
+    if layer_id == "16" or layer_id == "6" or layer_id == "27":
         file_name = 'latest.nc'
     if layer_id == "2" or layer_id =="10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
         file_name = 'latest_merged.nc'
