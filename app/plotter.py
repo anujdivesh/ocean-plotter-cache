@@ -31,6 +31,7 @@ import matplotlib
 from scipy.interpolate import NearestNDInterpolator
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import colors
 
 matplotlib.use('Agg')  # Non-interactive backend
 plt.switch_backend('Agg') 

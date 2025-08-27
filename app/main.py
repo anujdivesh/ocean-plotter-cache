@@ -36,6 +36,7 @@ from typing import Dict
 import logger
 from fastapi.middleware.gzip import GZipMiddleware
 from matplotlib.ticker import FormatStrFormatter
+from matplotlib import colors
 
 app = FastAPI(
     docs_url="/plotter/docs",
