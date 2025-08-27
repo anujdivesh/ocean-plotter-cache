@@ -1752,10 +1752,6 @@ class Plotter:
             file_name = f"AQUA_MODIS."+infix_formatted+".L3m.MO.CHL.chlor_a.4km.NRT.nc.dap.nc"
         if layer_id == "41":
             def get_weekly_filename(time_str):
-                """
-                Given a time string, returns the AQUA_MODIS 8-day composite filename
-                based on the custom start date 2025-05-25.
-                """
                 # Reference start and end date from your first dataset
                 ref_start = datetime(2025, 5, 25)
                 dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ")
