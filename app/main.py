@@ -320,12 +320,30 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                     extract_from_dap_ugrid=Plotter.extract_from_dap_ugrid, # your function here
                     west_bound=west_bound
                 )
+        """
         if cbar is not None and plot_type != "discrete":
             cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
             for t in cbar.ax.get_yticklabels():
                 t.set_horizontalalignment('left')
             cbar.ax.tick_params(axis='y', pad=-1, length=0)
-
+        """
+        if cbar is not None and plot_type != "discrete":
+            if layer_id == 29:
+                #cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                for t in cbar.ax.get_yticklabels():
+                    t.set_horizontalalignment('left')
+                cbar.ax.tick_params(axis='y', pad=4, length=0)
+            else:
+                if layer_id == 16:
+                    cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                    for t in cbar.ax.get_yticklabels():
+                        t.set_horizontalalignment('left')
+                    cbar.ax.tick_params(axis='y', pad=2, length=0)
+                else:
+                    cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                    for t in cbar.ax.get_yticklabels():
+                        t.set_horizontalalignment('left')
+                    cbar.ax.tick_params(axis='y', pad=-1, length=0)
 
         #ADD LOGO AND FOOTER
         Plotter.add_logo_and_footer(fig=fig, ax=ax, ax2=ax2, ax2_pos=ax2_pos, region=1, copyright_text=config.copyright_text,\

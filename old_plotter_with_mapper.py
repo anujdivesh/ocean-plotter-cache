@@ -737,6 +737,7 @@ def plot_filled_contours_no_zero(ax, ax_legend, lon, lat, data,
     )
     
     return cs, cbar
+
 """
 def plot_filled_contours_no_zero_levels(
         ax, ax_legend, lon, lat, data, 
@@ -914,9 +915,22 @@ def plot_filled_contours_no_zero_levels(
 def plot_filled_contours(ax, ax_legend, lon, lat, data, 
                         min_color_plot, max_color_plot, steps,
                         cmap_name='RdBu_r', units='(°C)'):
+    import numpy as np
+    import matplotlib.pyplot as plt
+
     # Create fixed levels for contours
     levels = np.arange(min_color_plot, max_color_plot, steps)
-    
+
+    # Determine number of decimal places in "steps"
+    steps_str = str(steps)
+    if '.' in steps_str:
+        n_decimals = len(steps_str.split('.')[-1])
+    else:
+        n_decimals = 0
+
+    # Set tick pad proportional to decimal places in 'steps'
+    tick_pad = 2 + n_decimals * 3  # adjust multiplier as needed
+
     # Plot filled contours with fixed levels
     cs = ax.contourf(
         lon, lat, data,
@@ -924,11 +938,16 @@ def plot_filled_contours(ax, ax_legend, lon, lat, data,
         cmap=cmap_name,
         extend='both'  # Adds arrows if data exceeds min/max
     )
-    
+
     # Add colorbar with matching ticks
     cbar = plt.colorbar(cs, cax=ax_legend)
     cbar.set_ticks(levels)  # Same ticks as contour levels
-    cbar.ax.tick_params(labelsize=7)
+
+    # Format tick labels to match the number of decimals in steps
+    tick_labels = [f"{level:.{n_decimals}f}" for level in levels]
+    cbar.set_ticklabels(tick_labels)
+
+    cbar.ax.tick_params(labelsize=7, pad=tick_pad)
     cbar.set_label(
         units,
         fontsize=6,
@@ -937,7 +956,7 @@ def plot_filled_contours(ax, ax_legend, lon, lat, data,
         ha='left',
         labelpad=1
     )
-    
+
     return cs, cbar
 
 def _mask_sst(data, units_hint=""):
@@ -1916,7 +1935,7 @@ def get_layer_dataset_download_info(layer_id, time=None, root_dir=None, mapper_f
     file_name = f"{prefix}{infix_formatted}{suffix}"
     if not file_name.endswith('.nc'):
         file_name += '.nc'
-    if layer_id == "16" or layer_id == "6" or layer_id == "27":
+    if layer_id == "16" or layer_id == "6" or layer_id == "27" or layer_id == "29":
         file_name = 'latest.nc'
     if layer_id == "2" or layer_id =="10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
         file_name = 'latest_merged.nc'
@@ -1987,7 +2006,7 @@ config = get_config_variables()
 
 #####PARAMETER#####
 region = 1
-layer_id = 36
+layer_id = 29
 #time= add_z_if_needed("2024-10-01T00:00:00Z")
 resolution = "l"
 #####PARAMETER#####
@@ -1997,7 +2016,7 @@ layer_map_data = fetch_wms_layer_data(layer_id)
 #REMOVE DEMO
 time = demo_time(layer_map_data)
 time = "2025-05-25T00:00:00Z"
-#time = "2025-09-16T00:00:00Z"
+time = "2025-09-16T00:00:00Z"
 #time = "2025-08-05T00:00:00Z"
 #SLA Daily
 #time = "2025-07-16T00:00:00Z"
@@ -2185,37 +2204,23 @@ elif plot_type == "ugrid_9":
             west_bound=west_bound
         )
 
-def adjust_cbar_label_padding(cbar, min_gap=2):
-    """
-    Adjusts cbar yticklabel padding if labels are too close to the colorbar.
-
-    Parameters:
-        cbar: The colorbar object.
-        min_gap: Minimum gap in points between the colorbar and labels.
-    """
-    fig = cbar.ax.figure
-    fig.canvas.draw()  # ensure text positions are updated
-
-    # Get the axis and labels bounding boxes in display coords
-    ax_bbox = cbar.ax.get_window_extent()
-    for t in cbar.ax.get_yticklabels():
-        if not t.get_visible():
-            continue
-        t_bbox = t.get_window_extent()
-        gap = t_bbox.x0 - ax_bbox.x1  # distance in pixels from axis to label's left
-        if gap < min_gap:
-            # Convert pixels to points (1 point = 1/72 inch)
-            pad_pts = t.get_size() / 2  # or any value that makes sense
-            cbar.ax.tick_params(axis='y', pad=pad_pts)
-            fig.canvas.draw()
-            break  # adjust once for all labels
-
 if cbar is not None and plot_type != "discrete":
-    cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
-    for t in cbar.ax.get_yticklabels():
-        t.set_horizontalalignment('left')
-    cbar.ax.tick_params(axis='y', pad=-1, length=0)
-    adjust_cbar_label_padding(cbar, min_gap=1)
+    if layer_id == 29:
+        #cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+        for t in cbar.ax.get_yticklabels():
+            t.set_horizontalalignment('left')
+        cbar.ax.tick_params(axis='y', pad=4, length=0)
+    else:
+        if layer_id == 16:
+            cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+            for t in cbar.ax.get_yticklabels():
+                t.set_horizontalalignment('left')
+            cbar.ax.tick_params(axis='y', pad=2, length=0)
+        else:
+            cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+            for t in cbar.ax.get_yticklabels():
+                t.set_horizontalalignment('left')
+            cbar.ax.tick_params(axis='y', pad=-1, length=0)
 #ADD LOGO AND FOOTER
 add_logo_and_footer(fig=fig, ax=ax, ax2=ax2, ax2_pos=ax2_pos, region=1, copyright_text=config.copyright_text,\
     footer_text=config.footer_text,dataset_text=dataset_text)

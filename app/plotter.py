@@ -737,6 +737,54 @@ class Plotter:
 
     @staticmethod
     def plot_filled_contours(ax, ax_legend, lon, lat, data, 
+                        min_color_plot, max_color_plot, steps,
+                        cmap_name='RdBu_r', units='(°C)'):
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # Create fixed levels for contours
+        levels = np.arange(min_color_plot, max_color_plot, steps)
+
+        # Determine number of decimal places in "steps"
+        steps_str = str(steps)
+        if '.' in steps_str:
+            n_decimals = len(steps_str.split('.')[-1])
+        else:
+            n_decimals = 0
+
+        # Set tick pad proportional to decimal places in 'steps'
+        tick_pad = 2 + n_decimals * 3  # adjust multiplier as needed
+
+        # Plot filled contours with fixed levels
+        cs = ax.contourf(
+            lon, lat, data,
+            levels=levels,
+            cmap=cmap_name,
+            extend='both'  # Adds arrows if data exceeds min/max
+        )
+
+        # Add colorbar with matching ticks
+        cbar = plt.colorbar(cs, cax=ax_legend)
+        cbar.set_ticks(levels)  # Same ticks as contour levels
+
+        # Format tick labels to match the number of decimals in steps
+        tick_labels = [f"{level:.{n_decimals}f}" for level in levels]
+        cbar.set_ticklabels(tick_labels)
+
+        cbar.ax.tick_params(labelsize=7, pad=tick_pad)
+        cbar.set_label(
+            units,
+            fontsize=6,
+            rotation=0,
+            va='center',
+            ha='left',
+            labelpad=1
+        )
+
+        return cs, cbar
+
+    """
+    def plot_filled_contours(ax, ax_legend, lon, lat, data, 
                             min_color_plot, max_color_plot, steps,
                             cmap_name='RdBu_r', units='(°C)'):
         # Create fixed levels for contours
@@ -764,7 +812,7 @@ class Plotter:
         )
         
         return cs, cbar
-
+    """
     @staticmethod
     def _mask_sst(data, units_hint=""):
         """
@@ -1902,7 +1950,7 @@ class Plotter:
         file_name = f"{prefix}{infix_formatted}{suffix}"
         if not file_name.endswith('.nc'):
             file_name += '.nc'
-        if layer_id == "16" or layer_id == "6" or layer_id == "27":
+        if layer_id == "16" or layer_id == "6" or layer_id == "27" or layer_id == "29":
             file_name = 'latest.nc'
         if layer_id == "2" or layer_id =="10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
             file_name = 'latest_merged.nc'
