@@ -619,7 +619,7 @@ async def proxy(url: str = Query(..., description="Full URL to proxy")):
             return Response(content=b"", status_code=200, media_type="application/octet-stream")
 #CACHE EEZ
 GEOSERVER_URL = "https://geonode.pacificdata.org/geoserver"
-TILE_SERVER_URL = "https://spc-osm.spc.int/tile/{z}/{x}/{y}.png"
+TILE_SERVER_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 GEOSERVER_URL_ONPREM = "https://opmgeoserver.gem.spc.int/geoserver"
 THREDDS_SERVER_URL = "https://ocean-thredds01.spc.int/thredds/wms"
 
