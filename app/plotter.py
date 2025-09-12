@@ -1437,11 +1437,14 @@ class Plotter:
         longitudes = filtered_cities['lon'].values
         latitudes = filtered_cities['lat'].values
         x_coords, y_coords = m(longitudes, latitudes)
+        font_zize = 6
 
+        if short_name == "PAC":
+            font_zize = 5
         # Plot city names
         for x, y, name in zip(x_coords, y_coords, filtered_cities['name']):
             ax.text(x + 0.1, y + 0.1, name,
-                    fontsize=6, color='black',
+                    fontsize=font_zize, color='black',
                     ha='left', va='center')
     @staticmethod
     def setup_static_directories(STATIC_DIR,SUB_DIRECTORIES):
