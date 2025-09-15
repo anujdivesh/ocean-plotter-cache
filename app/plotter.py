@@ -504,7 +504,7 @@ class Plotter:
     def get_title(layer_map_data,time):
         new_name = []
         week = False
-        date = datetime.strptime(Plotter.add_z_if_needed(time), "%Y-%m-%dT%H:%M:%SZ")
+        date = datetime.strptime(add_z_if_needed(time), "%Y-%m-%dT%H:%M:%SZ")
         date2 = date.strftime("%Y-%m-%dT%H%M%SZ")
         formatted_date = date.strftime("%-d %B %Y")
         orig_name = layer_map_data.get_map_names
@@ -525,13 +525,24 @@ class Plotter:
         dataset_text = "Reynolds SST"
 
         if layer_map_data.get_map_names != None or layer_map_data.get_map_names != "":
-            layer_map_data.get_map_names = layer_map_data.get_map_names.split('/')
-            formatted_date = date.strftime(layer_map_data.get_map_names[1])
-            if week:
-                title_suffix = "%s: %s" % (new_name[0],formatted_date)
+            if "new-line" in layer_map_data.get_map_names:
+                newliner = layer_map_data.get_map_names.split('new-line')
+                layer_map_data.get_map_names = newliner[0].split('/')
+                formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                if week:
+                    title_suffix = "%s: %s" % (new_name[0],formatted_date)
+                else:
+                    title_suffix = "%s: %s" % (layer_map_data.get_map_names[0],formatted_date)
+                
+                dataset_text = "%s \n%s" % (layer_map_data.get_map_names[2], newliner[1])
             else:
-                title_suffix = "%s: %s" % (layer_map_data.get_map_names[0],formatted_date)
-            dataset_text = layer_map_data.get_map_names[2]
+                layer_map_data.get_map_names = layer_map_data.get_map_names.split('/')
+                formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                if week:
+                    title_suffix = "%s: %s" % (new_name[0],formatted_date)
+                else:
+                    title_suffix = "%s: %s" % (layer_map_data.get_map_names[0],formatted_date)
+                dataset_text = layer_map_data.get_map_names[2]
         if "{week}" not in orig_name:
             if '{' in layer_map_data.get_map_names[0] and '}' in layer_map_data.get_map_names[0]:
                 if "Anomalies" in layer_map_data.get_map_names[0]:
@@ -569,6 +580,7 @@ class Plotter:
             title_suffix = "%s: %s - %s" % ( weekly_split[0],formatted_date,formatted_future_date)
 
         return title_suffix, dataset_text
+
 
     @staticmethod
     def plot_filled_contours_no_zero_levels(

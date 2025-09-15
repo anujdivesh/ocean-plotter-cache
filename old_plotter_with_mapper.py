@@ -647,13 +647,24 @@ def get_title(layer_map_data,time):
     dataset_text = "Reynolds SST"
 
     if layer_map_data.get_map_names != None or layer_map_data.get_map_names != "":
-        layer_map_data.get_map_names = layer_map_data.get_map_names.split('/')
-        formatted_date = date.strftime(layer_map_data.get_map_names[1])
-        if week:
-            title_suffix = "%s: %s" % (new_name[0],formatted_date)
+        if "new-line" in layer_map_data.get_map_names:
+            newliner = layer_map_data.get_map_names.split('new-line')
+            layer_map_data.get_map_names = newliner[0].split('/')
+            formatted_date = date.strftime(layer_map_data.get_map_names[1])
+            if week:
+                title_suffix = "%s: %s" % (new_name[0],formatted_date)
+            else:
+                title_suffix = "%s: %s" % (layer_map_data.get_map_names[0],formatted_date)
+            
+            dataset_text = "%s \n%s" % (layer_map_data.get_map_names[2], newliner[1])
         else:
-            title_suffix = "%s: %s" % (layer_map_data.get_map_names[0],formatted_date)
-        dataset_text = layer_map_data.get_map_names[2]
+            layer_map_data.get_map_names = layer_map_data.get_map_names.split('/')
+            formatted_date = date.strftime(layer_map_data.get_map_names[1])
+            if week:
+                title_suffix = "%s: %s" % (new_name[0],formatted_date)
+            else:
+                title_suffix = "%s: %s" % (layer_map_data.get_map_names[0],formatted_date)
+            dataset_text = layer_map_data.get_map_names[2]
     if "{week}" not in orig_name:
         if '{' in layer_map_data.get_map_names[0] and '}' in layer_map_data.get_map_names[0]:
             if "Anomalies" in layer_map_data.get_map_names[0]:
@@ -2006,7 +2017,7 @@ config = get_config_variables()
 
 #####PARAMETER#####
 region = 1
-layer_id = 29
+layer_id = 32
 #time= add_z_if_needed("2024-10-01T00:00:00Z")
 resolution = "l"
 #####PARAMETER#####
@@ -2016,12 +2027,12 @@ layer_map_data = fetch_wms_layer_data(layer_id)
 #REMOVE DEMO
 time = demo_time(layer_map_data)
 time = "2025-05-25T00:00:00Z"
-time = "2025-09-16T00:00:00Z"
+time = "2025-05-01T00:00:00Z"
 #time = "2025-08-05T00:00:00Z"
 #SLA Daily
 #time = "2025-07-16T00:00:00Z"
 #SLA MONTHLY
-time = "2025-05-01T00:00:00Z"
+#time = "2025-05-01T00:00:00Z"
 #BOMM
 #time = "2025-09-16T00:00:00Z"
 #REMOVE DEMO
@@ -2043,6 +2054,7 @@ print(local_file_name)
 #####MAIN#####
 dap_url, dap_variable = get_dap_config(layer_map_data)
 title, dataset_text = get_title(layer_map_data,time)
+print(dataset_text)
 cmap_name, plot_type, min_color_plot, max_color_plot, steps, units, levels, discrete = get_plot_config(layer_map_data)
 west_bound, east_bound, south_bound, north_bound, country_name, short_name = getBBox(region)
 if short_name == "PAC":
