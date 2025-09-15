@@ -551,15 +551,23 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
         ax.plot(df["Date"], df["Mean"], label="Mean", color="blue")
         ax.plot(df["Date"], df["Maximum"], label="Maximum", color="red", alpha=0.5)
         ax.plot(df["Date"], df["Minimum"], label="Minimum", color="green", alpha=0.5)
-        ax.plot(df["Date"], df["Mean_Trend"], "--", color="blue", label="Mean Trend")
+        #ax.plot(df["Date"], df["Mean_Trend"], "--", color="blue", label="Mean Trend")
 
         # Add annotations
+        latest_date = df["Date"].max()
+        month_name = latest_date.strftime("%B")
+        yearname = latest_date.strftime("%Y")
+        latest_date2 = df["Date"].min()
+        month_name2 = latest_date2.strftime("%B")
+        yearname2 = latest_date2.strftime("%Y")
+        """
         ax.text(
             df["Date"].iloc[5], max(df["Mean"]),
             f"Mean Trend Slope: {slope_mm_per_year:.2f} mm/year",
             fontsize=12, color="blue", bbox=dict(facecolor="white", alpha=0.6)
         )
-
+        """
+        
         # Set axis limits
         ax.set_xlim([df["Date"].min(), df["Date"].max()])
         ax.set_ylim([
@@ -571,7 +579,7 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
         ax.set_xlabel("Year")
         ax.set_ylabel("Sea Level (m)")
         ax.legend()
-        ax.set_title(f"Relative Sea Level\n{country} - {location}")
+        ax.set_title(f"Relative Sea Level from {month_name2} {yearname2} - {month_name} {yearname}\n{country} - {location}")
         ax.grid(True)
 
         # Add footer text
@@ -584,9 +592,19 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
             -0.08, ax2_pos.y0-0.195, "Climate and Ocean Support Program in the Pacific (COSPPac)",
             transform=ax.transAxes, fontsize=7, verticalalignment='top'
         )
+        ax.text(
+            -0.08, ax2_pos.y0-0.195, "Climate and Ocean Support Program in the Pacific (COSPPac)",
+            transform=ax.transAxes, fontsize=7, verticalalignment='top'
+        )
+        """
+        ax.text(
+            1.05, -0.08, "Vertical Land Motion (VLM) has not been removed.",
+            transform=ax.transAxes, fontsize=7, verticalalignment='top', horizontalalignment='right'
+        )
+        """
 
         # Save to cache
-        plt.savefig(cache_path, dpi=300, bbox_inches='tight')
+        plt.savefig(cache_path, dpi=300)
         plt.close()
 
         return FileResponse(
