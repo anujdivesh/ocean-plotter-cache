@@ -1131,7 +1131,7 @@ class Plotter:
 
         # Left-aligned copyright text (aligned with ax2's left edge)
         fig.text(
-            x=ax2_pos.x0-0.08, 
+            x=ax2_pos.x0-0.11, 
             y=text_y-0.03,
             s=copyright_text,
             ha='left',
@@ -1141,7 +1141,7 @@ class Plotter:
         # Right-aligned dataset text (aligned with ax2's right edge)
         # Using the dataset_text variable you already have from get_title()
         fig.text(
-            x=ax2_pos.x1+0.08, 
+            x=ax2_pos.x1+0.11, 
             y=text_y-0.03,
             s=dataset_text,
             ha='right',
