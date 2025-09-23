@@ -37,6 +37,7 @@ import logger
 from fastapi.middleware.gzip import GZipMiddleware
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib import colors
+import re
 
 app = FastAPI(
     docs_url="/plotter/docs",
@@ -537,21 +538,71 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
             f.write(response.text)
 
         # Process data
-        df = Plotter.read_sea_level_data(temp_file)
-        df["Date"] = pd.to_datetime(df.assign(Day=1)[["Year", "Month", "Day"]])
+        with open(temp_file, 'r') as file:
+            content = file.read()
+
+        # Extract the data rows (lines that start with numbers)
+        data_lines = []
+        for line in content.split('\n'):
+            # Look for lines that start with numbers (the data rows)
+            if re.match(r'^\s*\d+', line):
+                data_lines.append(line.strip())
+
+        # Process each data line, stopping when we encounter "Totals"
+        data = []
+        for line in data_lines:
+            # Split on multiple spaces and filter out empty strings
+            values = [x for x in line.split(' ') if x != '']
+            
+            # Stop processing when we reach "Totals" or any non-data row
+            if not values or values[0] == 'Totals' or not values[0].isdigit():
+                break
+            
+            # Convert numeric values to appropriate types
+            row = []
+            for i, value in enumerate(values):
+                if i < 2:  # Month and Year are integers
+                    row.append(int(value))
+                else:  # Other values are floats
+                    try:
+                        row.append(float(value))
+                    except ValueError:
+                        row.append(value)
+            
+            data.append(row)
+
+        # Create DataFrame
+        columns = ['Mth', 'Year', 'Gaps', 'Good', 'Minimum', 'Maximum', 'Mean', 'St Devn']
+        df = pd.DataFrame(data, columns=columns)
+        
+        #df = Plotter.read_sea_level_data(temp_file)
+        df = df.dropna(subset=["Mean"])
+        # === Step 2: Create datetime index ===
+        df["Date"] = pd.to_datetime(df["Year"].astype(int).astype(str) + "-" +
+                                    df["Mth"].astype(int).astype(str) + "-15")
 
         # Calculate trend
-        x = np.arange(len(df))
-        slope_mean, intercept_mean, _, _, _ = linregress(x, df["Mean"])
-        slope_mm_per_year = slope_mean * 12 * 1000
-        df["Mean_Trend"] = intercept_mean + slope_mean * x
+
+        time_num = df["Date"].map(datetime.toordinal).values  # convert dates to numeric
+        means = df["Mean"].values
+        mean_of_means = np.mean(means)
+        print(f"Mean of means: {mean_of_means:.4f}")
+        # === Step 4: Linear regression trend ===
+        slope, intercept, r_value, p_value, std_err = linregress(time_num, means)
+        trend = intercept + slope * time_num
+        # Convert slope to mm/year (assuming Mean is in meters)
+        slope_mm_year = slope * 365.25 * 1000  
+        #x = np.arange(len(df))
+        #slope_mean, intercept_mean, _, _, _ = linregress(x, df["Mean"])
+        #slope_mm_per_year = slope_mean * 12 * 1000
+        #df["Mean_Trend"] = intercept_mean + slope_mean * x
 
         # Create plot
         fig, ax = plt.subplots(figsize=(12, 6.5))
         ax.plot(df["Date"], df["Mean"], label="Mean", color="blue")
         ax.plot(df["Date"], df["Maximum"], label="Maximum", color="red", alpha=0.5)
         ax.plot(df["Date"], df["Minimum"], label="Minimum", color="green", alpha=0.5)
-        #ax.plot(df["Date"], df["Mean_Trend"], "--", color="blue", label="Mean Trend")
+        ax.plot(df["Date"], trend, "--", color="blue", label="Mean Trend")
 
         # Add annotations
         latest_date = df["Date"].max()
@@ -560,19 +611,19 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
         latest_date2 = df["Date"].min()
         month_name2 = latest_date2.strftime("%B")
         yearname2 = latest_date2.strftime("%Y")
-        """
+        
         ax.text(
             df["Date"].iloc[5], max(df["Mean"]),
-            f"Mean Trend Slope: {slope_mm_per_year:.2f} mm/year",
+            f"Mean Trend Slope: {slope_mm_year:.2f} mm/year",
             fontsize=12, color="blue", bbox=dict(facecolor="white", alpha=0.6)
         )
-        """
+    
         
         # Set axis limits
         ax.set_xlim([df["Date"].min(), df["Date"].max()])
         ax.set_ylim([
-            min(df["Minimum"].min(), df["Mean_Trend"].min()) * 0.98,
-            max(df["Maximum"].max(), df["Mean_Trend"].max()) * 1.02
+            min(df["Minimum"].min(), trend.min()) * 0.98,
+            max(df["Maximum"].max(), trend.max()) * 1.02
         ])
 
         # Formatting
@@ -596,12 +647,12 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
             -0.08, ax2_pos.y0-0.195, "Climate and Ocean Support Program in the Pacific (COSPPac)",
             transform=ax.transAxes, fontsize=7, verticalalignment='top'
         )
-        """
+        
         ax.text(
             1.05, -0.08, "Vertical Land Motion (VLM) has not been removed.",
             transform=ax.transAxes, fontsize=7, verticalalignment='top', horizontalalignment='right'
         )
-        """
+        
 
         # Save to cache
         plt.savefig(cache_path, dpi=300)
