@@ -147,6 +147,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         layer_map_data = Plotter.fetch_wms_layer_data(layer_id,token)
         #TEST
         #info = Plotter.get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')
+        #print(info)
         #PROD
         info = Plotter.get_layer_dataset_download_info(str(layer_id),time,'/app/datasets')
 
@@ -166,7 +167,9 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         else:
             local_file_name = "%s/%s" % (info['path'], info['file_name'])
             check_local = True
-        check_local = False
+        
+        #REMOVE THIS
+        #check_local = False
 
         #REMOVE DEMO
         #time = Plotter.demo_time(layer_map_data)
@@ -239,7 +242,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             step = 10
             if int(region) == 1:
                 step = 30
-            cs, q, cbar = Plotter.plot_wave_field(ax2, ax_legend, m, lon, lat, wave_height, wave_dir,\
+            cs, q, cbar = Plotter.plot_wave_field(is_imperial_layer,ax2, ax_legend, m, lon, lat, wave_height, wave_dir,\
                                     min_color_plot, max_color_plot, steps,region, step, cmap_name=cmap_name, units=units)
         elif plot_type == "discrete":
             lons, lats, bleaching_data = Plotter.getfromDAP(dap_url, time, dap_variable, adjust_lon=True,\

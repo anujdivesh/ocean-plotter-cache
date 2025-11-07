@@ -1457,7 +1457,7 @@ class Plotter:
         return pc, cbar
 
     @staticmethod
-    def plot_wave_field(ax, ax_legend, m, lon, lat, wave_height, wave_dir,
+    def plot_wave_field(is_imperial_layer,ax, ax_legend, m, lon, lat, wave_height, wave_dir,
                     min_color_plot, max_color_plot, steps, region, step,
                     cmap_name='jet', units='m',
                     scale=30, arrow_scale=0.5):
