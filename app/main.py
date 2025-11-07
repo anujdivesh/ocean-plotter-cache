@@ -9,6 +9,7 @@ import io
 import matplotlib.pyplot as plt  # Correct import
 import numpy as np
 from plotter import Plotter
+from send_mail import SPCMailer
 from mpl_toolkits.basemap import Basemap
 from fastapi.responses import FileResponse
 import hashlib
@@ -121,10 +122,10 @@ def read_root():
 
 #MAPS FOR OCEAN PORTAL
 @ocean_router.get("/getMap")
-async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True,token: str = 'null'):
+async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True,token: str = 'null',unit: str = 'metric'):
     # Generate unique filename based on parameters
     params_hash = hashlib.md5(f"{region}_{layer_map}_{time}".encode()).hexdigest()
-    filename = "plot_%s_%s_%s.png" % (region,layer_map,params_hash)
+    filename = "plot_%s_%s_%s_%s.png" % (region,layer_map,unit,params_hash)
     #filename = f"plot_{params_hash}.png"
     filepath = STATIC_DIR / "maps" / filename
 
@@ -140,12 +141,23 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         #time= add_z_if_needed("2024-10-01T00:00:00Z")
         resolution = "l"
         #####PARAMETER#####
+        unit_type = unit
+        
 
         layer_map_data = Plotter.fetch_wms_layer_data(layer_id,token)
         #TEST
         #info = Plotter.get_layer_dataset_download_info(str(layer_id),time,'/Users/anujdivesh/Desktop/django/production')
         #PROD
         info = Plotter.get_layer_dataset_download_info(str(layer_id),time,'/app/datasets')
+
+        ##UNITS
+        unit_type = unit
+        is_imperial_layer = Plotter.imperial_layers(layer_id)
+        if is_imperial_layer:
+            if unit_type == "imperial":
+                is_imperial_layer = True
+            else:
+                is_imperial_layer = False
 
         check_local = True
         local_file_name = ""
@@ -154,6 +166,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         else:
             local_file_name = "%s/%s" % (info['path'], info['file_name'])
             check_local = True
+        check_local = False
 
         #REMOVE DEMO
         #time = Plotter.demo_time(layer_map_data)
@@ -194,20 +207,20 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         if plot_type == "contourf":
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
                 local_path=check_local, local_path_str=local_file_name)
-            cs, cbar = Plotter.plot_filled_contours(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
+            cs, cbar = Plotter.plot_filled_contours(is_imperial_layer,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
         elif plot_type == "contourf_nozero":
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
                 local_path=check_local, local_path_str=local_file_name)
-            cs, cbar = Plotter.plot_filled_contours_no_zero(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
+            cs, cbar = Plotter.plot_filled_contours_no_zero(is_imperial_layer,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units
             )
         elif plot_type == "contourf_nozero_levels":
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
             local_path=check_local, local_path_str=local_file_name)
 
-            cs, cbar = Plotter.plot_filled_contours_no_zero_levels(ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
+            cs, cbar = Plotter.plot_filled_contours_no_zero_levels(is_imperial_layer,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,levels=levels
             )
             
@@ -264,7 +277,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             split_varib = dap_variable.split(",")
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, split_varib[0],adjust_lon=True,\
             local_path=check_local, local_path_str=local_file_name)
-            cs, cbar = Plotter.plot_climatology(dap_url,time,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
+            cs, cbar = Plotter.plot_climatology(is_imperial_layer,dap_url,time,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,
                 local_path=check_local, local_path_str=local_file_name
             )
@@ -323,12 +336,6 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                 )
         """
         if cbar is not None and plot_type != "discrete":
-            cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
-            for t in cbar.ax.get_yticklabels():
-                t.set_horizontalalignment('left')
-            cbar.ax.tick_params(axis='y', pad=-1, length=0)
-        """
-        if cbar is not None and plot_type != "discrete":
             if layer_id == 29:
                 #cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
                 for t in cbar.ax.get_yticklabels():
@@ -345,6 +352,42 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                     for t in cbar.ax.get_yticklabels():
                         t.set_horizontalalignment('left')
                     cbar.ax.tick_params(axis='y', pad=-1, length=0)
+        """
+        if cbar is not None and plot_type != "discrete":
+            if is_imperial_layer:
+                # For imperial layers - DON'T use FormatStrFormatter
+                # Just adjust visual properties
+                for t in cbar.ax.get_yticklabels():
+                    t.set_horizontalalignment('left')
+                cbar.ax.tick_params(axis='y', pad=2, length=0)
+            else:
+                if layer_id == 29:
+                    #cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                    for t in cbar.ax.get_yticklabels():
+                        t.set_horizontalalignment('left')
+                    cbar.ax.tick_params(axis='y', pad=4, length=0)
+                else:
+                    if layer_id == 16 or layer_id == 17:
+                        cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                        for t in cbar.ax.get_yticklabels():
+                            t.set_horizontalalignment('left')
+                        cbar.ax.tick_params(axis='y', pad=2, length=0)
+                    elif layer_id == 26:
+                        cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                        for t in cbar.ax.get_yticklabels():
+                            t.set_horizontalalignment('left')
+                        cbar.ax.tick_params(axis='y', pad=2, length=0)
+                    elif layer_id == 33 or layer_id == 34:
+                        cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                        for t in cbar.ax.get_yticklabels():
+                            t.set_horizontalalignment('left')
+                        cbar.ax.tick_params(axis='y', pad=2, length=0)
+                    else:
+                        cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                        for t in cbar.ax.get_yticklabels():
+                            t.set_horizontalalignment('left')
+                        cbar.ax.tick_params(axis='y', pad=-1, length=0)
+        
 
         #ADD LOGO AND FOOTER
         Plotter.add_logo_and_footer(fig=fig, ax=ax, ax2=ax2, ax2_pos=ax2_pos, region=1, copyright_text=config.copyright_text,\
@@ -390,6 +433,10 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             return StreamingResponse(buf, media_type="image/png", headers={"Cache-Control": "no-store"})
     except Exception as e:
         plt.close('all')  # Ensure all figures are closed on error
+        message = "There is issues plotting Layer %s, region %s, time %s, unit %s. \n %s Vinaka.." % (layer_map,region, time, unit,str(e))
+        SPCMailer.send_notification_email_sync( to="divesha@spc.int",
+            subject="Ocean plotter",
+            body=message)
         return {"error": str(e)}
 
 #LEGEND FOR OCEAN PORTAL

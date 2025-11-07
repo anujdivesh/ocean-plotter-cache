@@ -32,7 +32,7 @@ from scipy.interpolate import NearestNDInterpolator
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import colors
-
+import re
 matplotlib.use('Agg')  # Non-interactive backend
 plt.switch_backend('Agg') 
 
@@ -583,23 +583,212 @@ class Plotter:
 
 
     @staticmethod
+    def plot_filled_contours_no_zero_levels(is_imperial_layer,
+            ax, ax_legend, lon, lat, data, 
+            min_color_plot=None, max_color_plot=None, steps=None,
+            cmap_name='RdBu_r', units='(°C)', levels=None, white_color=(1, 1, 1, 1)):
+
+        base = plt.get_cmap(cmap_name)
+
+        
+        # Ensure data is properly masked - handle both regular arrays and masked arrays
+        if hasattr(data, 'mask'):
+            # Data is already a masked array
+            data_masked = data
+            print(f"Input data is already masked: {np.sum(data_masked.mask)} masked points")
+        else:
+            # Convert to masked array, properly handling NaN values
+            print(f"Input data is regular array, checking for NaN values...")
+            data_masked = np.ma.masked_invalid(data)
+            print(f"After masking: {np.sum(data_masked.mask)} masked points")
+        
+        # Additional check: look for very large/small values that might be fill values
+        if np.sum(data_masked.mask) == 0:
+            print("Warning: No masked values found, but expecting some near coastlines")
+            # Try alternative masking for very large/small values that might represent fill values
+            data_range = np.nanmax(data) - np.nanmin(data)
+            if data_range > 1000:  # Unusually large range might indicate fill values
+                print("Large data range detected, checking for extreme values...")
+                extreme_mask = (np.abs(data) > 1e10) | (data == -9999) | (data == 9999)
+                if np.any(extreme_mask):
+                    data_masked = np.ma.masked_where(extreme_mask, data)
+                    print(f"Found {np.sum(extreme_mask)} extreme values to mask")
+
+
+        # If levels not provided, derive from range (excluding zero)
+        if levels is None:
+            if steps is None or min_color_plot is None or max_color_plot is None:
+                raise ValueError("Provide levels or all of min_color_plot, max_color_plot, and steps.")
+            levels = np.arange(min_color_plot, max_color_plot, steps, dtype=float)
+            levels = levels[levels != 0]
+
+        levels = np.asarray(levels, dtype=float)
+
+        # Basic validations
+        if levels.ndim != 1 or len(levels) < 2:
+            raise ValueError("levels must be a 1D array with at least two ascending values.")
+        if not np.all(np.diff(levels) > 0):
+            raise ValueError("levels must be strictly increasing.")
+
+        n_intervals = len(levels) - 1
+
+        # Detect a single "gap across zero": levels[i] < 0 < levels[i+1]
+        cross_idxs = np.where((levels[:-1] < 0) & (levels[1:] > 0))[0]
+
+        # Build interval colors
+        interval_colors = None
+        if cross_idxs.size == 1:
+            # There is exactly one central gap across zero
+            center_idx = int(cross_idxs[0])
+            n_neg = center_idx                     # intervals fully below 0
+            n_pos = n_intervals - center_idx - 1   # intervals fully above 0
+
+            # Sample blue-ish side for negatives, red-ish for positives from RdBu_r
+            neg_samples = np.linspace(0.05, 0.45, n_neg) if n_neg > 0 else np.array([])
+            pos_samples = np.linspace(0.55, 0.95, n_pos) if n_pos > 0 else np.array([])
+
+            colors_neg = [base(v) for v in neg_samples]
+            colors_pos = [base(v) for v in pos_samples]
+
+            # Central band white
+            interval_colors = colors_neg + [white_color] + colors_pos
+
+        else:
+            # No gap across zero (all-negative or all-positive) or ambiguous.
+            # Just map all intervals to one side of the palette to avoid the neutral center.
+            all_pos = np.all(levels >= 0)
+            all_neg = np.all(levels <= 0)
+
+            if all_pos:
+                samples = np.linspace(0.55, 0.95, n_intervals)  # reds
+            elif all_neg:
+                samples = np.linspace(0.05, 0.45, n_intervals)  # blues
+            else:
+                # If ambiguous (e.g., 0 inside levels), distribute across both sides but no white band.
+                # Split at 0 index if present, otherwise fall back to full span.
+                if np.any(np.isclose(levels, 0.0)):
+                    zero_idx = int(np.where(np.isclose(levels, 0.0))[0][0])
+                    n_neg = zero_idx
+                    n_pos = n_intervals - zero_idx
+                    neg_samples = np.linspace(0.05, 0.45, n_neg) if n_neg > 0 else np.array([])
+                    pos_samples = np.linspace(0.55, 0.95, n_pos) if n_pos > 0 else np.array([])
+                    interval_colors = [base(v) for v in neg_samples] + [base(v) for v in pos_samples]
+                else:
+                    samples = np.linspace(0.05, 0.95, n_intervals)
+
+            if interval_colors is None:
+                interval_colors = [base(v) for v in samples]
+
+        # Add under/over colors since we use extend='both'
+        under_color = base(0.0)
+        over_color = base(1.0)
+        colors_list = [under_color] + interval_colors + [over_color]  # length == len(levels) + 1
+
+        # Build discrete cmap/norm with correct extend
+        cmap, norm = colors.from_levels_and_colors(levels, colors_list, extend='both')
+
+        # CRITICAL: Set the bad color to transparent for masked values
+        cmap.set_bad(alpha=0.0)  # Make masked values completely transparent
+
+        # Plot with masked data - use the properly masked array
+        cs = ax.contourf(
+            lon, lat, data_masked,  # Use the masked data
+            levels=levels,
+            cmap=cmap,
+            norm=norm,
+            extend='both'
+        )
+
+        
+
+        # Create colorbar with imperial labels if it's an imperial layer
+        # Create colorbar with imperial labels if it's an imperial layer
+        if is_imperial_layer:
+            if 'C' in units:
+                # Convert Celsius to Fahrenheit
+                def celsius_to_fahrenheit(c):
+                    return (c * 9/5) + 32
+                
+                # Create Fahrenheit tick labels
+                imperial_levels = [celsius_to_fahrenheit(level) for level in levels]
+                
+                # Format the labels with appropriate precision
+                imperial_labels = []
+                for val in imperial_levels:
+                    if val == 0:
+                        imperial_labels.append("0")
+                    elif abs(val) < 1:
+                        imperial_labels.append(f"{val:.2f}")
+                    elif abs(val) < 10:
+                        imperial_labels.append(f"{val:.1f}")
+                    else:
+                        imperial_labels.append(f"{val:.0f}")
+                
+                # Update units label
+                units_label = '(°F)'
+                
+            elif 'mm' in units.lower():
+                # Convert millimeters to feet: 1 mm = 0.00328084 feet
+                def mm_to_feet(mm):
+                    return mm * 0.00328084
+                
+                # Create feet tick labels
+                imperial_levels = [mm_to_feet(level) for level in levels]
+                
+                # Format the labels with appropriate precision
+                imperial_labels = []
+                for val in imperial_levels:
+                    if val == 0:
+                        imperial_labels.append("0")
+                    elif abs(val) < 0.01:
+                        imperial_labels.append(f"{val:.4f}")
+                    elif abs(val) < 0.1:
+                        imperial_labels.append(f"{val:.3f}")
+                    elif abs(val) < 1:
+                        imperial_labels.append(f"{val:.2f}")
+                    elif abs(val) < 10:
+                        imperial_labels.append(f"{val:.1f}")
+                    else:
+                        imperial_labels.append(f"{val:.0f}")
+                
+                # Update units label
+                units_label = '(ft)'
+            
+            else:
+                # For other imperial conversions (like meters to feet), add here
+                imperial_levels = levels
+                imperial_labels = [str(level) for level in levels]
+                units_label = units
+            
+            # Create colorbar with imperial labels
+            cbar = plt.colorbar(cs, cax=ax_legend)
+            cbar.set_ticks(levels)  # Keep the original levels for positioning
+            cbar.set_ticklabels(imperial_labels)  # But show imperial values
+            cbar.set_label(units_label, fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+                
+        else:
+            # Regular metric colorbar
+            cbar = plt.colorbar(cs, cax=ax_legend)
+            cbar.set_ticks(levels)
+            cbar.set_label(units, fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+
+        # Style the colorbar
+        cbar.ax.tick_params(labelsize=8, pad=8, direction='out', length=6, width=1)
+        
+        try:
+            cbar.solids.set_edgecolor("face")
+        except Exception:
+            pass
+
+        return cs, cbar
+
+    """
     def plot_filled_contours_no_zero_levels(
             ax, ax_legend, lon, lat, data, 
             min_color_plot=None, max_color_plot=None, steps=None,
             cmap_name='RdBu_r', units='(°C)', levels=None, white_color=(1, 1, 1, 1)):
 
-        """
-        Draw filled contours with:
-        - Discrete colors (one color per interval)
-        - Central band across zero painted white if levels jump over 0 (e.g., ...,-30, 30,...)
-        - Diverging colors: blue for negatives, red for positives (RdBu_r)
-        - Proper handling of extend='both' via from_levels_and_colors
-
-        levels: strictly increasing sequence of boundaries (no zero is fine).
-                Example:
-                [-4, -3, -2, -1.2, -0.8, -0.4, 0.4, 0.8, 1.2, 2, 3, 4]
-                [-300, -200, -100, -60, -30, 30, 60, 100, 200, 300]
-        """
+        
 
         base = plt.get_cmap(cmap_name)
 
@@ -697,7 +886,7 @@ class Plotter:
             pass
 
         return cs, cbar
-
+    """
 
     @staticmethod
     def get_plot_config(layer_map_data):
@@ -716,6 +905,65 @@ class Plotter:
         return cmap_name, plot_type, min_color_plot,max_color_plot,steps,units,levels,discrete
 
     @staticmethod
+    def plot_filled_contours_no_zero(is_imperial_layer,ax, ax_legend, lon, lat, data, 
+                            min_color_plot, max_color_plot, steps,
+                            cmap_name='RdBu_r', units='(°C)'):
+        #print('accesss')
+        # Create fixed levels for contours, excluding zero
+        levels = np.arange(min_color_plot, max_color_plot, steps)
+        levels = levels[levels != 0]  # Remove zero level
+        
+        # Plot filled contours with fixed levels
+        cs = ax.contourf(
+            lon, lat, data,
+            levels=levels,
+            cmap=cmap_name,
+            extend='both'  # Adds arrows if data exceeds min/max
+        )
+        
+        # Create colorbar with Fahrenheit labels if it's an imperial layer
+        if is_imperial_layer and 'C' in units:
+            # Convert Celsius levels to Fahrenheit for display
+            # CORRECT FORMULA: F = (C × 9/5) + 32
+            def celsius_to_fahrenheit(c):
+                return (c * 9/5) + 32
+            
+            # Create Fahrenheit tick labels
+            fahrenheit_levels = [celsius_to_fahrenheit(level) for level in levels]
+            
+            # Format the labels with appropriate precision
+            fahrenheit_labels = []
+            for f_val in fahrenheit_levels:
+                if f_val == 0:
+                    fahrenheit_labels.append("0")
+                elif abs(f_val) < 1:
+                    fahrenheit_labels.append(f"{f_val:.2f}")
+                elif abs(f_val) < 10:
+                    fahrenheit_labels.append(f"{f_val:.1f}")
+                else:
+                    fahrenheit_labels.append(f"{f_val:.0f}")
+            
+            # Create colorbar with Fahrenheit labels
+            cbar = plt.colorbar(cs, cax=ax_legend)
+            cbar.set_ticks(levels)  # Keep the original Celsius levels for positioning
+            cbar.set_ticklabels(fahrenheit_labels)  # But show Fahrenheit values
+            
+            # Update units label
+            units_label = '(°F)'
+            cbar.set_label(units_label, fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+            
+        else:
+            # Regular Celsius colorbar
+            cbar = plt.colorbar(cs, cax=ax_legend)
+            cbar.set_ticks(levels)
+            cbar.set_label(units, fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+
+        # Style the colorbar
+        cbar.ax.tick_params(labelsize=8, pad=2, direction='out', length=6, width=1)
+        
+        return cs, cbar
+
+    """
     def plot_filled_contours_no_zero(ax, ax_legend, lon, lat, data, 
                             min_color_plot, max_color_plot, steps,
                             cmap_name='RdBu_r', units='(°C)'):
@@ -746,8 +994,173 @@ class Plotter:
         )
         
         return cs, cbar
-
+    """
     @staticmethod
+    def plot_filled_contours(is_imperial_layer,ax, ax_legend, lon, lat, data, 
+                            min_color_plot, max_color_plot, steps,
+                            cmap_name='RdBu_r', units='(°C)'):
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # Create fixed levels for contours
+        levels = np.arange(min_color_plot, max_color_plot, steps)
+
+        # Determine number of decimal places in "steps"
+        steps_str = str(steps)
+        if '.' in steps_str:
+            n_decimals = len(steps_str.split('.')[-1])
+        else:
+            n_decimals = 0
+
+        # Set tick pad proportional to decimal places in 'steps'
+        tick_pad = 2 + n_decimals * 3  # adjust multiplier as needed
+
+        # Plot filled contours with fixed levels
+        cs = ax.contourf(
+            lon, lat, data,
+            levels=levels,
+            cmap=cmap_name,
+            extend='both'  # Adds arrows if data exceeds min/max
+        )
+        cbar = plt.colorbar(cs, cax=ax_legend)
+        
+        if is_imperial_layer and re.search(r'\bm\b', units.lower()):
+            # Convert current tick values from meters to feet
+            current_ticks = cbar.get_ticks()
+            feet_ticks = [tick * 3.28084 for tick in current_ticks]  # meters to feet
+            
+            # Create formatted labels
+            feet_labels = []
+            for f_val in feet_ticks:
+                if f_val == 0:
+                    feet_labels.append("0")
+                elif abs(f_val) < 1:
+                    feet_labels.append(f"{f_val:.2f}")
+                elif abs(f_val) < 10:
+                    feet_labels.append(f"{f_val:.1f}")
+                else:
+                    feet_labels.append(f"{f_val:.0f}")
+            
+            # Set the new labels
+            cbar.set_ticklabels(feet_labels)
+            units_label = '(ft)'
+            cbar.ax.tick_params(labelsize=8, pad=tick_pad)
+            cbar.set_label(
+                units_label,
+                fontsize=7,
+                rotation=0,
+                va='center',
+                ha='left',
+                labelpad=1
+            )
+        elif is_imperial_layer and 'C' in units:
+            # Convert levels from Celsius to Fahrenheit
+            fahrenheit_levels = [(level * 9/5) + 32 for level in levels]  # Celsius to Fahrenheit
+            
+            # Create formatted labels
+            fahrenheit_labels = []
+            for f_val in fahrenheit_levels:
+                if f_val == 0:
+                    fahrenheit_labels.append("0")
+                elif abs(f_val) < 1:
+                    fahrenheit_labels.append(f"{f_val:.2f}")
+                elif abs(f_val) < 10:
+                    fahrenheit_labels.append(f"{f_val:.1f}")
+                else:
+                    fahrenheit_labels.append(f"{f_val:.0f}")
+            
+            # Set the new labels
+            cbar.set_ticks(levels)  # Keep original levels for positioning
+            cbar.set_ticklabels(fahrenheit_labels)
+            units_label = '(°F)'
+            cbar.ax.tick_params(labelsize=8, pad=tick_pad)
+            cbar.set_label(
+                units_label,
+                fontsize=7,
+                rotation=0,
+                va='center',
+                ha='left',
+                labelpad=1
+            )
+        elif 'mm' in units.lower():
+            # Convert millimeters to feet: 1 mm = 0.00328084 feet
+            def mm_to_feet(mm):
+                return mm * 0.00328084
+            
+            # Create feet tick labels
+            imperial_levels = [mm_to_feet(level) for level in levels]
+            
+            # Format the labels with appropriate precision
+            imperial_labels = []
+            for val in imperial_levels:
+                if val == 0:
+                    imperial_labels.append("0")
+                elif abs(val) < 0.01:
+                    imperial_labels.append(f"{val:.4f}")
+                elif abs(val) < 0.1:
+                    imperial_labels.append(f"{val:.3f}")
+                elif abs(val) < 1:
+                    imperial_labels.append(f"{val:.2f}")
+                elif abs(val) < 10:
+                    imperial_labels.append(f"{val:.1f}")
+                else:
+                    imperial_labels.append(f"{val:.0f}")
+            
+            # Set the new ticks and labels - THIS WAS MISSING
+            cbar.set_ticks(levels)  # Keep original levels for positioning
+            cbar.set_ticklabels(imperial_labels)
+            units_label = '(ft)'
+            cbar.ax.tick_params(labelsize=8, pad=tick_pad)
+            cbar.set_label(
+                units_label,
+                fontsize=7,
+                rotation=0,
+                va='center',
+                ha='left',
+                labelpad=1
+            )
+        else:
+            units_label = units
+            cbar.set_ticks(levels)  # Same ticks as contour levels
+
+            # Format tick labels to match the number of decimals in steps
+            tick_labels = [f"{level:.{n_decimals}f}" for level in levels]
+            cbar.set_ticklabels(tick_labels)
+
+            cbar.ax.tick_params(labelsize=8, pad=tick_pad)
+            cbar.set_label(
+                units,
+                fontsize=7,
+                rotation=0,
+                va='center',
+                ha='left',
+                labelpad=1
+            )
+        
+        
+        """
+        # Add colorbar with matching ticks
+        cbar = plt.colorbar(cs, cax=ax_legend)
+        cbar.set_ticks(levels)  # Same ticks as contour levels
+
+        # Format tick labels to match the number of decimals in steps
+        tick_labels = [f"{level:.{n_decimals}f}" for level in levels]
+        cbar.set_ticklabels(tick_labels)
+
+        cbar.ax.tick_params(labelsize=7, pad=tick_pad)
+        cbar.set_label(
+            units,
+            fontsize=6,
+            rotation=0,
+            va='center',
+            ha='left',
+            labelpad=1
+        )
+        """
+
+        return cs, cbar
+
+    """
     def plot_filled_contours(ax, ax_legend, lon, lat, data, 
                         min_color_plot, max_color_plot, steps,
                         cmap_name='RdBu_r', units='(°C)'):
@@ -794,36 +1207,6 @@ class Plotter:
         )
 
         return cs, cbar
-
-    """
-    def plot_filled_contours(ax, ax_legend, lon, lat, data, 
-                            min_color_plot, max_color_plot, steps,
-                            cmap_name='RdBu_r', units='(°C)'):
-        # Create fixed levels for contours
-        levels = np.arange(min_color_plot, max_color_plot, steps)
-        
-        # Plot filled contours with fixed levels
-        cs = ax.contourf(
-            lon, lat, data,
-            levels=levels,
-            cmap=cmap_name,
-            extend='both'  # Adds arrows if data exceeds min/max
-        )
-        
-        # Add colorbar with matching ticks
-        cbar = plt.colorbar(cs, cax=ax_legend)
-        cbar.set_ticks(levels)  # Same ticks as contour levels
-        cbar.ax.tick_params(labelsize=7)
-        cbar.set_label(
-            units,
-            fontsize=6,
-            rotation=0,
-            va='center',
-            ha='left',
-            labelpad=1
-        )
-        
-        return cs, cbar
     """
     @staticmethod
     def _mask_sst(data, units_hint=""):
@@ -838,6 +1221,145 @@ class Plotter:
         ma = np.ma.masked_where(np.isclose(ma, 0.0), ma)
         return ma
     @staticmethod
+    def plot_climatology(is_imperial_layer,
+        dap_url, time, ax, ax_legend, lon, lat, data, 
+        min_color_plot, max_color_plot, steps,
+        cmap_name='RdBu_r', units='(°C)', local_path=False, local_path_str=None
+    ):
+        """
+        Plot SST and climatology, including 29°C contours for both.
+        """
+        # Color levels
+        levels = np.arange(min_color_plot, max_color_plot, steps)
+
+        # Mask SST to prevent coastlines from appearing as isolines
+        data_masked = _mask_sst(data, units_hint=units)
+
+        # Filled contours
+        cs = ax.contourf(
+            lon, lat, data_masked,
+            levels=levels,
+            cmap=cmap_name,
+            extend='both',
+            corner_mask=True
+        )
+
+        # SST 29°C contour
+        ax.contour(
+            lon, lat, data_masked,
+            levels=[29],
+            colors='purple',
+            linewidths=2,
+            linestyles='solid',
+            zorder=6,
+            corner_mask=True
+        )
+
+        # Try plotting climatology 29°C contour
+        try:
+            clim_lon, clim_lat, sst_clim = getfromDAP(
+                dap_url, time, "sst_clim", adjust_lon=True,
+                local_path=local_path, local_path_str=local_path_str
+            )
+            sst_clim_masked = _mask_sst(sst_clim, units_hint=units)
+            cont = ax.contour(
+                clim_lon, clim_lat, sst_clim_masked,
+                levels=[29],
+                colors='green',
+                linewidths=2,
+                linestyles='solid',
+                zorder=7,
+                corner_mask=True
+            )
+            # Optional: warn if not drawn at all
+            if len(cont.allsegs[0][0]) == 0:
+                print("Warning: No green climatology contour drawn at 29°C (level not present in data).")
+        except Exception as e:
+            print(f"Climatology 29°C contour not plotted: {e}")
+
+        # Legend
+        legend_elements = [
+            Line2D([0], [0], color='purple', lw=2, label='SST 29°C'),
+            Line2D([0], [0], color='green', lw=2, label='Climatology 29°C')
+        ]
+        ax.legend(handles=legend_elements, loc='upper right', fontsize=6)
+
+        # Colorbar
+        if is_imperial_layer:
+            if 'C' in units:
+                # Convert Celsius to Fahrenheit
+                def celsius_to_fahrenheit(c):
+                    return (c * 9/5) + 32
+                
+                # Create Fahrenheit tick labels
+                imperial_levels = [celsius_to_fahrenheit(level) for level in levels]
+                
+                # Format the labels with appropriate precision
+                imperial_labels = []
+                for val in imperial_levels:
+                    if val == 0:
+                        imperial_labels.append("0")
+                    elif abs(val) < 1:
+                        imperial_labels.append(f"{val:.2f}")
+                    elif abs(val) < 10:
+                        imperial_labels.append(f"{val:.1f}")
+                    else:
+                        imperial_labels.append(f"{val:.0f}")
+                
+                # Update units label
+                units_label = '(°F)'
+                
+            elif 'mm' in units.lower():
+                # Convert millimeters to feet: 1 mm = 0.00328084 feet
+                def mm_to_feet(mm):
+                    return mm * 0.00328084
+                
+                # Create feet tick labels
+                imperial_levels = [mm_to_feet(level) for level in levels]
+                
+                # Format the labels with appropriate precision
+                imperial_labels = []
+                for val in imperial_levels:
+                    if val == 0:
+                        imperial_labels.append("0")
+                    elif abs(val) < 0.01:
+                        imperial_labels.append(f"{val:.4f}")
+                    elif abs(val) < 0.1:
+                        imperial_labels.append(f"{val:.3f}")
+                    elif abs(val) < 1:
+                        imperial_labels.append(f"{val:.2f}")
+                    elif abs(val) < 10:
+                        imperial_labels.append(f"{val:.1f}")
+                    else:
+                        imperial_labels.append(f"{val:.0f}")
+                
+                # Update units label
+                units_label = '(ft)'
+            
+            else:
+                # For other imperial conversions (like meters to feet), add here
+                imperial_levels = levels
+                imperial_labels = [str(level) for level in levels]
+                units_label = units
+            
+            # Create colorbar with imperial labels
+            cbar = plt.colorbar(cs, cax=ax_legend)
+            cbar.set_ticks(levels)  # Keep the original levels for positioning
+            cbar.set_ticklabels(imperial_labels)  # But show imperial values
+            cbar.set_label(units_label, fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+                
+        else:
+            # Regular metric colorbar
+            cbar = plt.colorbar(cs, cax=ax_legend)
+            cbar.set_ticks(levels)
+            cbar.set_label(units, fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+
+        # Style the colorbar
+        cbar.ax.tick_params(labelsize=8, pad=2, direction='out', length=6, width=1)
+
+        return cs, cbar
+
+    """
     def plot_climatology(dap_url, time, ax, ax_legend, lon, lat, data, 
                         min_color_plot, max_color_plot, steps,
                         cmap_name='RdBu_r', units='(°C)', local_path=False, local_path_str=None):
@@ -900,7 +1422,7 @@ class Plotter:
         cbar.set_label(units, fontsize=6, rotation=0, va='center', ha='left', labelpad=1)
 
         return cs, cbar
-
+    """
     @staticmethod
     def plot_filled_pcolor(ax, ax_legend, lon, lat, data, 
                     min_color_plot, max_color_plot, steps,
@@ -960,6 +1482,87 @@ class Plotter:
             shading='auto'
         )
         
+        cbar = plt.colorbar(cs, cax=ax_legend)
+
+        if is_imperial_layer and 'm' in units.lower():
+            # Convert current tick values from meters to feet
+            current_ticks = cbar.get_ticks()
+            feet_ticks = [tick * 3.28084 for tick in current_ticks]  # meters to feet
+            
+            # Create formatted labels
+            feet_labels = []
+            for f_val in feet_ticks:
+                if f_val == 0:
+                    feet_labels.append("0")
+                elif abs(f_val) < 1:
+                    feet_labels.append(f"{f_val:.2f}")
+                elif abs(f_val) < 10:
+                    feet_labels.append(f"{f_val:.1f}")
+                else:
+                    feet_labels.append(f"{f_val:.0f}")
+            
+            # Set the new labels
+            cbar.set_ticklabels(feet_labels)
+            units_label = '(ft)'
+        else:
+            units_label = units
+
+        cbar.set_label(
+            units_label,
+            fontsize=6,
+            rotation=0,
+            va='center',
+            ha='left',
+            labelpad=1
+        )
+        
+        # Create directional arrows (already corrected by +180 above)
+        theta = wave_dir_rad  # Use the already corrected direction
+        u_arrows = arrow_scale * np.sin(theta)
+        v_arrows = arrow_scale * np.cos(theta)
+        
+        q = ax.quiver(x[::step, ::step], y[::step, ::step], 
+                    u_arrows[::step, ::step], v_arrows[::step, ::step],
+                    scale=scale, width=0.003, 
+                    headwidth=2.5, headlength=3, headaxislength=2.5,
+                    color='black', pivot='middle', minshaft=2,
+                    edgecolor='black', linewidth=0.3)
+        
+        # Add quiver key (without text)
+        qk = plt.quiverkey(q, 0.82, 0.12, 1, 
+                        '', labelpos='E',
+                        coordinates='axes', fontproperties={'size': 9},
+                        labelsep=0.05, labelcolor='black')
+        cbar.ax.tick_params(labelsize=8)
+        
+        return cs, q, cbar
+
+    """
+    def plot_wave_field(ax, ax_legend, m, lon, lat, wave_height, wave_dir,
+                    min_color_plot, max_color_plot, steps, region, step,
+                    cmap_name='jet', units='m',
+                    scale=30, arrow_scale=0.5):
+        
+        # Convert wave direction to components (add 180° to reverse direction)
+        wave_dir_rad = np.radians(wave_dir + 180)  # Reverse direction for quiver plot
+        u = wave_height * np.sin(wave_dir_rad)  # Eastward component
+        v = wave_height * np.cos(wave_dir_rad)  # Northward component
+        
+        # Create grid coordinates
+        x, y = m(*np.meshgrid(lon, lat))
+        
+        # Create levels and normalization
+        levels = np.arange(min_color_plot, max_color_plot, steps)
+        norm = BoundaryNorm(levels, ncolors=256)
+        
+        # Plot wave height field
+        cs = ax.pcolormesh(
+            x, y, wave_height,
+            cmap=cmap_name,
+            norm=norm,
+            shading='auto'
+        )
+        
         # Create colorbar in specified legend axes
         cbar = plt.colorbar(cs, cax=ax_legend)
         cbar.set_label(
@@ -991,7 +1594,7 @@ class Plotter:
         cbar.ax.tick_params(labelsize=7)
         
         return cs, q, cbar
-
+    """
     @staticmethod
     def plot_discrete_map(ax, ax_legend, lons, lats, bleaching_data, 
                             cmap_colors=None, colorbar_labels=None):
@@ -2030,6 +2633,51 @@ class Plotter:
             "path": path,
             "file_name": file_name
         }
+
+    @staticmethod
+    def imperial_layers(layer_id):
+        vbool = False
+        if layer_id == 5:
+            vbool = True
+        if layer_id == 2:
+            vbool = True
+        if layer_id == 6:
+            vbool = True
+        if layer_id == 7:
+            vbool = True
+        if layer_id == 11:
+            vbool = True
+        if layer_id == 12:
+            vbool = True
+        if layer_id == 16:
+            vbool = True
+        if layer_id == 17:
+            vbool = True
+        if layer_id == 18:
+            vbool = True
+        if layer_id == 20:
+            vbool = True
+        if layer_id == 26:
+            vbool = True
+        if layer_id == 33:
+            vbool = True
+        if layer_id == 34:
+            vbool = True
+        if layer_id == 35:
+            vbool = True
+        if layer_id == 36:
+            vbool = True
+        if layer_id == 38:
+            vbool = True
+        if layer_id == 39:
+            vbool = True
+        if layer_id == 42:
+            vbool = True
+        if layer_id == 47:
+            vbool = True
+        if layer_id == 48:
+            vbool = True
+        return vbool
 
 
     @staticmethod
