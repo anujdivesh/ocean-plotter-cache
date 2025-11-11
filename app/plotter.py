@@ -1220,15 +1220,13 @@ class Plotter:
         ma = np.ma.masked_where((ma <= -3.0) | (ma >= 45.0), ma)
         ma = np.ma.masked_where(np.isclose(ma, 0.0), ma)
         return ma
-    @staticmethod
+    
+    """
     def plot_climatology(is_imperial_layer,
         dap_url, time, ax, ax_legend, lon, lat, data, 
         min_color_plot, max_color_plot, steps,
         cmap_name='RdBu_r', units='(°C)', local_path=False, local_path_str=None
     ):
-        """
-        Plot SST and climatology, including 29°C contours for both.
-        """
         # Color levels
         levels = np.arange(min_color_plot, max_color_plot, steps)
 
@@ -1359,7 +1357,7 @@ class Plotter:
 
         return cs, cbar
 
-    """
+    @staticmethod
     def plot_climatology(dap_url, time, ax, ax_legend, lon, lat, data, 
                         min_color_plot, max_color_plot, steps,
                         cmap_name='RdBu_r', units='(°C)', local_path=False, local_path_str=None):
