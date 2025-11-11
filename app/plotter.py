@@ -1359,7 +1359,7 @@ class Plotter:
 
     """
     @staticmethod
-    def plot_climatology(dap_url, time, ax, ax_legend, lon, lat, data, 
+    def plot_climatology(is_imperial_layer,dap_url, time, ax, ax_legend, lon, lat, data, 
                         min_color_plot, max_color_plot, steps,
                         cmap_name='RdBu_r', units='(°C)', local_path=False, local_path_str=None):
         # Color levels
