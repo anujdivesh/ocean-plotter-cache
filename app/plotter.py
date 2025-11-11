@@ -1233,7 +1233,7 @@ class Plotter:
         levels = np.arange(min_color_plot, max_color_plot, steps)
 
         # Mask SST to prevent coastlines from appearing as isolines
-        data_masked = _mask_sst(data, units_hint=units)
+        data_masked = Plotter._mask_sst(data, units_hint=units)
 
         # Filled contours
         cs = ax.contourf(
@@ -1261,7 +1261,7 @@ class Plotter:
                 dap_url, time, "sst_clim", adjust_lon=True,
                 local_path=local_path, local_path_str=local_path_str
             )
-            sst_clim_masked = _mask_sst(sst_clim, units_hint=units)
+            sst_clim_masked = Plotter._mask_sst(sst_clim, units_hint=units)
             cont = ax.contour(
                 clim_lon, clim_lat, sst_clim_masked,
                 levels=[29],
