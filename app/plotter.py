@@ -1415,10 +1415,77 @@ class Plotter:
         ax.legend(handles=legend_elements, loc='upper right', fontsize=6)
 
         # Colorbar
-        cbar = plt.colorbar(cs, cax=ax_legend)
-        cbar.set_ticks(levels)
-        cbar.ax.tick_params(labelsize=7)
-        cbar.set_label(units, fontsize=6, rotation=0, va='center', ha='left', labelpad=1)
+        if is_imperial_layer:
+            if 'C' in units:
+                # Convert Celsius to Fahrenheit
+                def celsius_to_fahrenheit(c):
+                    return (c * 9/5) + 32
+                
+                # Create Fahrenheit tick labels
+                imperial_levels = [celsius_to_fahrenheit(level) for level in levels]
+                
+                # Format the labels with appropriate precision
+                imperial_labels = []
+                for val in imperial_levels:
+                    if val == 0:
+                        imperial_labels.append("0")
+                    elif abs(val) < 1:
+                        imperial_labels.append(f"{val:.2f}")
+                    elif abs(val) < 10:
+                        imperial_labels.append(f"{val:.1f}")
+                    else:
+                        imperial_labels.append(f"{val:.0f}")
+                
+                # Update units label
+                units_label = '(°F)'
+                
+            elif 'mm' in units.lower():
+                # Convert millimeters to feet: 1 mm = 0.00328084 feet
+                def mm_to_feet(mm):
+                    return mm * 0.00328084
+                
+                # Create feet tick labels
+                imperial_levels = [mm_to_feet(level) for level in levels]
+                
+                # Format the labels with appropriate precision
+                imperial_labels = []
+                for val in imperial_levels:
+                    if val == 0:
+                        imperial_labels.append("0")
+                    elif abs(val) < 0.01:
+                        imperial_labels.append(f"{val:.4f}")
+                    elif abs(val) < 0.1:
+                        imperial_labels.append(f"{val:.3f}")
+                    elif abs(val) < 1:
+                        imperial_labels.append(f"{val:.2f}")
+                    elif abs(val) < 10:
+                        imperial_labels.append(f"{val:.1f}")
+                    else:
+                        imperial_labels.append(f"{val:.0f}")
+                
+                # Update units label
+                units_label = '(ft)'
+            
+            else:
+                # For other imperial conversions (like meters to feet), add here
+                imperial_levels = levels
+                imperial_labels = [str(level) for level in levels]
+                units_label = units
+            
+            # Create colorbar with imperial labels
+            cbar = plt.colorbar(cs, cax=ax_legend)
+            cbar.set_ticks(levels)  # Keep the original levels for positioning
+            cbar.set_ticklabels(imperial_labels)  # But show imperial values
+            cbar.set_label(units_label, fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+                
+        else:
+            # Regular metric colorbar
+            cbar = plt.colorbar(cs, cax=ax_legend)
+            cbar.set_ticks(levels)
+            cbar.set_label(units, fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+
+        # Style the colorbar
+        cbar.ax.tick_params(labelsize=8, pad=2, direction='out', length=6, width=1)
 
         return cs, cbar
     
