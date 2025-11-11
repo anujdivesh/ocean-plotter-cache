@@ -1356,7 +1356,7 @@ class Plotter:
         cbar.ax.tick_params(labelsize=8, pad=2, direction='out', length=6, width=1)
 
         return cs, cbar
-
+    """
     @staticmethod
     def plot_climatology(dap_url, time, ax, ax_legend, lon, lat, data, 
                         min_color_plot, max_color_plot, steps,
