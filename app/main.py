@@ -223,7 +223,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, dap_variable,adjust_lon=True,\
             local_path=check_local, local_path_str=local_file_name)
 
-            cs, cbar = Plotter.plot_filled_contours_no_zero_levels(is_imperial_layer,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
+            cs, cbar = Plotter.plot_filled_contours_no_zero_levels(title,is_imperial_layer,ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,levels=levels
             )
             

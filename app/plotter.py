@@ -583,7 +583,7 @@ class Plotter:
 
 
     @staticmethod
-    def plot_filled_contours_no_zero_levels(is_imperial_layer,
+    def plot_filled_contours_no_zero_levels(title,is_imperial_layer,
             ax, ax_legend, lon, lat, data, 
             min_color_plot=None, max_color_plot=None, steps=None,
             cmap_name='RdBu_r', units='(°C)', levels=None, white_color=(1, 1, 1, 1)):
@@ -708,9 +708,14 @@ class Plotter:
                 # Convert Celsius to Fahrenheit
                 def celsius_to_fahrenheit(c):
                     return (c * 9/5) + 32
+                def celsius_to_fahrenheit_anom(c):
+                    return (c * 9/5)
                 
                 # Create Fahrenheit tick labels
-                imperial_levels = [celsius_to_fahrenheit(level) for level in levels]
+                if "Anomal" in title:
+                    imperial_levels = [celsius_to_fahrenheit_anom(level) for level in levels]
+                else:
+                    imperial_levels = [celsius_to_fahrenheit(level) for level in levels]
                 
                 # Format the labels with appropriate precision
                 imperial_labels = []
