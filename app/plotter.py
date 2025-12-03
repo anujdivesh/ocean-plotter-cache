@@ -2572,7 +2572,7 @@ class Plotter:
         file_name = f"{prefix}{infix_formatted}{suffix}"
         if not file_name.endswith('.nc'):
             file_name += '.nc'
-        if layer_id == "16" or layer_id == "6" or layer_id == "27" or layer_id == "29" or layer_id == "3" or layer_id == "53" or layer_id == "28":
+        if layer_id == "16" or layer_id == "54" or layer_id == "6" or layer_id == "27" or layer_id == "29" or layer_id == "3" or layer_id == "53" or layer_id == "28":
             file_name = 'latest.nc'
         if layer_id == "2" or layer_id =="10" or layer_id =="11" or layer_id =="12" or layer_id =="14":
             file_name = 'latest_merged.nc'
@@ -2680,6 +2680,8 @@ class Plotter:
         if layer_id == 47:
             vbool = True
         if layer_id == 48:
+            vbool = True
+        if layer_id == 54:
             vbool = True
         return vbool
 
