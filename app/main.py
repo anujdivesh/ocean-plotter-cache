@@ -370,7 +370,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                         t.set_horizontalalignment('left')
                     cbar.ax.tick_params(axis='y', pad=4, length=0)
                 else:
-                    if layer_id == 16 or layer_id == 17:
+                    if layer_id == 16 or layer_id == 17 or layer_id == 54:
                         cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
                         for t in cbar.ax.get_yticklabels():
                             t.set_horizontalalignment('left')
