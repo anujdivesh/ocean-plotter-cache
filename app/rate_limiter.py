@@ -13,7 +13,7 @@ from send_mail import SPCMailer
 class RateLimiter:
     def __init__(
         self,
-        blocklist_file: str = "blocklist.json",
+        blocklist_file: str = None,
         rate_limit: int = 5,
         time_window: int = 60
     ):
@@ -25,7 +25,11 @@ class RateLimiter:
             rate_limit: Maximum allowed requests in time_window
             time_window: Time window in seconds
         """
-        self.blocklist_file = Path(blocklist_file)
+        # Resolve blocklist path: default next to this file
+        if blocklist_file is None:
+            self.blocklist_file = Path(__file__).parent / "blocklist.json"
+        else:
+            self.blocklist_file = Path(blocklist_file)
         self.rate_limit = rate_limit
         self.time_window = time_window
         
@@ -41,13 +45,35 @@ class RateLimiter:
     def load_blocklist(self) -> None:
         """Load blocked IPs from JSON file, create if doesn't exist"""
         try:
+            # Ensure parent directory exists
+            if self.blocklist_file.parent and not self.blocklist_file.parent.exists():
+                self.blocklist_file.parent.mkdir(parents=True, exist_ok=True)
+
             if self.blocklist_file.exists():
-                with open(self.blocklist_file, 'r') as f:
-                    data = json.load(f)
-                    self.blocked_ips = set(data.get("blocked_ips", []))
-                    logging.info(f"Loaded {len(self.blocked_ips)} blocked IPs from {self.blocklist_file}")
+                try:
+                    with open(self.blocklist_file, 'r') as f:
+                        content = f.read().strip()
+                        if content:
+                            data = json.loads(content)
+                            self.blocked_ips = set(data.get("blocked_ips", []))
+                            logging.info(f"Loaded {len(self.blocked_ips)} blocked IPs from {self.blocklist_file}")
+                        else:
+                            # Empty file, initialize
+                            self.save_blocklist()
+                            logging.info(f"Initialized empty blocklist file: {self.blocklist_file}")
+                except json.JSONDecodeError:
+                    logging.warning(f"Invalid JSON in {self.blocklist_file}, reinitializing")
+                    self.save_blocklist()
+                except Exception as e:
+                    logging.error(f"Error reading blocklist file {self.blocklist_file}: {e}")
+                    self.save_blocklist()
             else:
                 # Create empty blocklist file
+                try:
+                    self.blocklist_file.touch(exist_ok=True)
+                except Exception:
+                    # If touch fails, proceed to save
+                    pass
                 self.save_blocklist()
                 logging.info(f"Created new blocklist file: {self.blocklist_file}")
         except Exception as e:
@@ -66,6 +92,10 @@ class RateLimiter:
                     "time_window": self.time_window
                 }
             }
+            # Ensure parent directory exists before writing
+            if self.blocklist_file.parent and not self.blocklist_file.parent.exists():
+                self.blocklist_file.parent.mkdir(parents=True, exist_ok=True)
+
             with open(self.blocklist_file, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
