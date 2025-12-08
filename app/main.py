@@ -39,7 +39,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib import colors
 import re
-from rate_limiter import RateLimiter
 
 app = FastAPI(
     docs_url="/plotter/docs",
@@ -58,12 +57,6 @@ app.add_middleware(
     max_age=3600  # 1 hour cache for CORS preflight
 )
 ocean_router = APIRouter(prefix="/plotter")
-
-rate_limiter = RateLimiter(
-    blocklist_file="blocklist.json",  # Creates in current directory
-    rate_limit=5,                     # 5 requests
-    time_window=60                    # per 60 seconds
-)
 
 # Configuration
 STATIC_DIR = Path(__file__).parent.parent / "app" / "static"
@@ -130,30 +123,6 @@ def read_root():
 #MAPS FOR OCEAN PORTAL
 @ocean_router.get("/getMap")
 async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True,token: str = 'null',unit: str = 'metric'):
-    # ============ RATE LIMITING CHECK ============
-    client_ip = rate_limiter.get_client_ip(request)
-    
-    # Skip rate limiting for localhost (optional)
-    if client_ip not in ["127.0.0.1", "localhost"]:
-        is_blocked, message = rate_limiter.check_and_block(client_ip)
-        if is_blocked:
-            logging.warning(f"Blocked request from {client_ip} for /getMap")
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "error": "Too Many Requests",
-                    "message": message,
-                    "detail": "Exceeded rate limit of 5 requests per minute",
-                    "blocked_ip": client_ip
-                },
-                headers={
-                    "Retry-After": "999999",
-                    "X-RateLimit-Limit": "5",
-                    "X-RateLimit-Window": "60"
-                }
-            )
-    # =============================================
-    
     # Generate unique filename based on parameters
     params_hash = hashlib.md5(f"{region}_{layer_map}_{time}".encode()).hexdigest()
     filename = "plot_%s_%s_%s_%s.png" % (region,layer_map,unit,params_hash)
