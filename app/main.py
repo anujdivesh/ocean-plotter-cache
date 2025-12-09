@@ -436,10 +436,10 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
             return StreamingResponse(buf, media_type="image/png", headers={"Cache-Control": "no-store"})
     except Exception as e:
         plt.close('all')  # Ensure all figures are closed on error
-        message = "There is issues plotting Layer %s, region %s, time %s, unit %s. \n %s Vinaka.." % (layer_map,region, time, unit,str(e))
-        SPCMailer.send_notification_email_sync( to="divesha@spc.int",
-            subject="Ocean plotter",
-            body=message)
+        #message = "There is issues plotting Layer %s, region %s, time %s, unit %s. \n %s Vinaka.." % (layer_map,region, time, unit,str(e))
+        #SPCMailer.send_notification_email_sync( to="divesha@spc.int",
+        #    subject="Ocean plotter",
+        #    body=message)
         return {"error": str(e)}
 
 #LEGEND FOR OCEAN PORTAL
