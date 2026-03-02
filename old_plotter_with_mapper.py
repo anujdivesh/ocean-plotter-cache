@@ -668,13 +668,55 @@ def get_title(layer_map_data,time):
     if "{week}" not in orig_name:
         if '{' in layer_map_data.get_map_names[0] and '}' in layer_map_data.get_map_names[0]:
             if "Anomalies" in layer_map_data.get_map_names[0]:
-                cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '')
-                formatted_date = date.strftime(layer_map_data.get_map_names[1])
-                date_str = layer_map_data.get_map_names[1]
-                start_date = date
-                end_date = start_date + relativedelta(months=2)
-                formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
-                title_suffix = "%s : %s" % (cleaned, formatted_range)
+                if "66" in layer_map_data.get_map_names[0]:
+                    cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('66', '')
+                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                    date_str = layer_map_data.get_map_names[1]
+                    start_date = date
+                    end_date = start_date + relativedelta(months=5)
+                    formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                    title_suffix = "%s : %s" % (cleaned, formatted_range)
+                elif "122" in layer_map_data.get_map_names[0]:
+                    cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('122', '')
+                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                    date_str = layer_map_data.get_map_names[1]
+                    start_date = date
+                    end_date = start_date + relativedelta(months=11)
+                    formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                    title_suffix = "%s : %s" % (cleaned, formatted_range)
+                else:
+                    cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '')
+                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                    date_str = layer_map_data.get_map_names[1]
+                    start_date = date
+                    end_date = start_date + relativedelta(months=2)
+                    formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                    title_suffix = "%s : %s" % (cleaned, formatted_range)
+            elif "Decile" in layer_map_data.get_map_names[0]:
+                if "66" in layer_map_data.get_map_names[0]:
+                    cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('66', '')
+                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                    date_str = layer_map_data.get_map_names[1]
+                    start_date = date
+                    end_date = start_date + relativedelta(months=5)
+                    formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                    title_suffix = "%s : %s" % (cleaned, formatted_range)
+                elif "122" in layer_map_data.get_map_names[0]:
+                    cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('122', '')
+                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                    date_str = layer_map_data.get_map_names[1]
+                    start_date = date
+                    end_date = start_date + relativedelta(months=11)
+                    formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                    title_suffix = "%s : %s" % (cleaned, formatted_range)
+                elif "33" in layer_map_data.get_map_names[0]:
+                    cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('33', '')
+                    formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                    date_str = layer_map_data.get_map_names[1]
+                    start_date = date
+                    end_date = start_date + relativedelta(months=2)
+                    formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                    title_suffix = "%s : %s" % (cleaned, formatted_range)
             else:    
                 cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '')
                 if "Seasonal" in cleaned:
@@ -2017,7 +2059,7 @@ config = get_config_variables()
 
 #####PARAMETER#####
 region = 1
-layer_id = 32
+layer_id = 37
 #time= add_z_if_needed("2024-10-01T00:00:00Z")
 resolution = "l"
 #####PARAMETER#####
@@ -2028,6 +2070,7 @@ layer_map_data = fetch_wms_layer_data(layer_id)
 time = demo_time(layer_map_data)
 time = "2025-05-25T00:00:00Z"
 time = "2025-05-01T00:00:00Z"
+time = "2026-02-01T00:00:00Z"
 #time = "2025-08-05T00:00:00Z"
 #SLA Daily
 #time = "2025-07-16T00:00:00Z"
@@ -2045,7 +2088,7 @@ if info == 0:
 else:
     local_file_name = "%s/%s" % (info['path'], info['file_name'])
     check_local = True
-
+check_local = False
 print(check_local)
 print(local_file_name)
 #sys.exit()

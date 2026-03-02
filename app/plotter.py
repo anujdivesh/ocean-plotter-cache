@@ -504,7 +504,7 @@ class Plotter:
     def get_title(layer_map_data,time):
         new_name = []
         week = False
-        date = datetime.strptime(Plotter.add_z_if_needed(time), "%Y-%m-%dT%H:%M:%SZ")
+        date = datetime.strptime(add_z_if_needed(time), "%Y-%m-%dT%H:%M:%SZ")
         date2 = date.strftime("%Y-%m-%dT%H%M%SZ")
         formatted_date = date.strftime("%-d %B %Y")
         orig_name = layer_map_data.get_map_names
@@ -564,6 +564,31 @@ class Plotter:
                         title_suffix = "%s : %s" % (cleaned, formatted_range)
                     else:
                         cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '')
+                        formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                        date_str = layer_map_data.get_map_names[1]
+                        start_date = date
+                        end_date = start_date + relativedelta(months=2)
+                        formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                        title_suffix = "%s : %s" % (cleaned, formatted_range)
+                elif "Decile" in layer_map_data.get_map_names[0]:
+                    if "66" in layer_map_data.get_map_names[0]:
+                        cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('66', '')
+                        formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                        date_str = layer_map_data.get_map_names[1]
+                        start_date = date
+                        end_date = start_date + relativedelta(months=5)
+                        formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                        title_suffix = "%s : %s" % (cleaned, formatted_range)
+                    elif "122" in layer_map_data.get_map_names[0]:
+                        cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('122', '')
+                        formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                        date_str = layer_map_data.get_map_names[1]
+                        start_date = date
+                        end_date = start_date + relativedelta(months=11)
+                        formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                        title_suffix = "%s : %s" % (cleaned, formatted_range)
+                    elif "33" in layer_map_data.get_map_names[0]:
+                        cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('33', '')
                         formatted_date = date.strftime(layer_map_data.get_map_names[1])
                         date_str = layer_map_data.get_map_names[1]
                         start_date = date
