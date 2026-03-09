@@ -1179,14 +1179,24 @@ class Plotter:
             cbar.set_ticklabels(tick_labels)
 
             cbar.ax.tick_params(labelsize=8, pad=tick_pad)
-            cbar.set_label(
-                units,
-                fontsize=7,
-                rotation=0,
-                va='center',
-                ha='left',
-                labelpad=1
-            )
+            if "Decade" in units_label:
+                cbar.set_label(
+                    units,
+                    fontsize=7,
+                    rotation=90,
+                    va='center',
+                    ha='left',
+                    labelpad=1
+                )
+            else:
+                cbar.set_label(
+                    units,
+                    fontsize=7,
+                    rotation=0,
+                    va='center',
+                    ha='left',
+                    labelpad=1
+                )
         
         
         """
