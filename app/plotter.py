@@ -1185,7 +1185,7 @@ class Plotter:
                     fontsize=7,
                     rotation=90,
                     va='center',
-                    ha='left',
+                    ha='center',
                     labelpad=5
                 )
             else:
