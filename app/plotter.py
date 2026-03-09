@@ -1175,13 +1175,7 @@ class Plotter:
             cbar.set_ticks(levels)  # Same ticks as contour levels
 
             # Format tick labels to match the number of decimals in steps
-            tick_labels = []
-            for level in levels:
-                if abs(level) < 1e-10:  # Check if effectively zero
-                    tick_labels.append(f"0.0")
-                else:
-                    tick_labels.append(f"{level:.{n_decimals}f}")
-
+            tick_labels = [f"{level:.{n_decimals}f}".replace("-0.0", "0.0") for level in levels]
             cbar.set_ticklabels(tick_labels)
 
             # Format tick labels to match the number of decimals in steps
