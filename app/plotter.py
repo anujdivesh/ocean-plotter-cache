@@ -1184,10 +1184,14 @@ class Plotter:
 
             #Format tick labels to match the number of decimals in steps
             def format_tick(level):
+                # Collapse any form of negative/rounded zero (e.g. -0.0, -0.00, 0.00) to plain "0"
                 if abs(level) < 1e-10:  # Effectively zero
-                    return f"0.0"
+                    return "0"
                 formatted = f"{level:.{n_decimals}f}"
-                return "0.0" if formatted == "-0.0" else formatted
+                try:
+                    return "0" if float(formatted) == 0.0 else formatted
+                except ValueError:
+                    return formatted
             
             tick_labels = [format_tick(level) for level in levels]
             cbar.set_ticklabels(tick_labels)
