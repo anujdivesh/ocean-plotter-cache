@@ -28,7 +28,7 @@ from dateutil.relativedelta import relativedelta
 from scipy.interpolate import NearestNDInterpolator
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import FormatStrFormatter, FuncFormatter
 from matplotlib import colors
 
 #####FUNCTIONS#####
@@ -997,7 +997,17 @@ def plot_filled_contours(ax, ax_legend, lon, lat, data,
     cbar.set_ticks(levels)  # Same ticks as contour levels
 
     # Format tick labels to match the number of decimals in steps
-    tick_labels = [f"{level:.{n_decimals}f}" for level in levels]
+    zero_label = f"{0:.{n_decimals}f}"
+
+    def _format_tick(level):
+        formatted = f"{level:.{n_decimals}f}"
+        try:
+            # Collapse '-0.0' / '-0.00' (and any rounded-zero) to a clean zero label
+            return zero_label if float(formatted) == 0.0 else formatted
+        except ValueError:
+            return formatted
+
+    tick_labels = [_format_tick(level) for level in levels]
     cbar.set_ticklabels(tick_labels)
 
     cbar.ax.tick_params(labelsize=7, pad=tick_pad)
@@ -2059,7 +2069,7 @@ config = get_config_variables()
 
 #####PARAMETER#####
 region = 1
-layer_id = 37
+layer_id = 61
 #time= add_z_if_needed("2024-10-01T00:00:00Z")
 resolution = "l"
 #####PARAMETER#####
@@ -2070,7 +2080,7 @@ layer_map_data = fetch_wms_layer_data(layer_id)
 time = demo_time(layer_map_data)
 time = "2025-05-25T00:00:00Z"
 time = "2025-05-01T00:00:00Z"
-time = "2026-02-01T00:00:00Z"
+time = "2025-01-01T00:00:00Z"
 #time = "2025-08-05T00:00:00Z"
 #SLA Daily
 #time = "2025-07-16T00:00:00Z"
@@ -2267,12 +2277,16 @@ if cbar is not None and plot_type != "discrete":
         cbar.ax.tick_params(axis='y', pad=4, length=0)
     else:
         if layer_id == 16:
-            cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+            cbar.ax.yaxis.set_major_formatter(
+                FuncFormatter(lambda x, pos: f"{(0.0 if abs(x) < 1e-12 else x):6.1f}".replace("-0.0", "0.0"))
+            )
             for t in cbar.ax.get_yticklabels():
                 t.set_horizontalalignment('left')
             cbar.ax.tick_params(axis='y', pad=2, length=0)
         else:
-            cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+            cbar.ax.yaxis.set_major_formatter(
+                FuncFormatter(lambda x, pos: f"{(0.0 if abs(x) < 1e-12 else x):6.1f}".replace("-0.0", "0.0"))
+            )
             for t in cbar.ax.get_yticklabels():
                 t.set_horizontalalignment('left')
             cbar.ax.tick_params(axis='y', pad=-1, length=0)

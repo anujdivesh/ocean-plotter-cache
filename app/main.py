@@ -36,7 +36,7 @@ import gzip
 from typing import Dict
 import logger
 from fastapi.middleware.gzip import GZipMiddleware
-from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import FormatStrFormatter, FuncFormatter
 from matplotlib import colors
 import re
 
@@ -387,7 +387,10 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                             t.set_horizontalalignment('left')
                         cbar.ax.tick_params(axis='y', pad=2, length=0)
                     else:
-                        cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
+                        cbar.ax.yaxis.set_major_formatter(
+                            FuncFormatter(lambda x, pos: f"{(0.0 if abs(x) < 1e-12 else x):6.1f}".replace("-0.0", "0.0"))
+                        )
+                        #cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
                         for t in cbar.ax.get_yticklabels():
                             t.set_horizontalalignment('left')
                         cbar.ax.tick_params(axis='y', pad=-1, length=0)
