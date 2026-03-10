@@ -1184,12 +1184,14 @@ class Plotter:
 
             #Format tick labels to match the number of decimals in steps
             def format_tick(level):
-                # Collapse any form of negative/rounded zero (e.g. -0.0, -0.00, 0.00) to plain "0"
+                # Collapse any form of negative/rounded zero (e.g. -0.0, -0.00) to a clean zero label
+                # while keeping the same decimal precision as the step.
+                zero_label = f"{0:.{n_decimals}f}"
                 if abs(level) < 1e-10:  # Effectively zero
-                    return "0"
+                    return zero_label
                 formatted = f"{level:.{n_decimals}f}"
                 try:
-                    return "0" if float(formatted) == 0.0 else formatted
+                    return zero_label if float(formatted) == 0.0 else formatted
                 except ValueError:
                     return formatted
             
