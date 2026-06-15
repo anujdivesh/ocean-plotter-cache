@@ -134,6 +134,16 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
     if use_cache and filepath.exists():
         return FileResponse(filepath, media_type="image/png")
 
+    # If not using cache, clear any existing cached files for this dataset
+    # (all unit/time variants of this region + layer_map) so stale maps
+    # are not served on subsequent cached requests.
+    if not use_cache:
+        for stale in (STATIC_DIR / "maps").glob(f"plot_{region}_{layer_map}_*.png"):
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+
     try:
         config = Plotter.get_config_variables()
         #####PARAMETER#####
@@ -355,7 +365,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                     cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
                     for t in cbar.ax.get_yticklabels():
                         t.set_horizontalalignment('left')
-                    cbar.ax.tick_params(axis='y', pad=-1, length=0)
+                        cbar.ax.tick_params(axis='y', pad=-1, length=0)
         """
         if cbar is not None and plot_type != "discrete":
             if is_imperial_layer:
@@ -448,16 +458,14 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
 
 #LEGEND FOR OCEAN PORTAL
 @ocean_router.get("/GetLegendGraphic")
-async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min_color: float = 0.0,max_color: float = 0.0,step: float = 0.0,color: str = '',unit: str = '',use_cache: bool = True):
-    # Generate a unique cache key based on all parameters
-    cache_params = f"{layer_map}_{mode}_{min_color}_{max_color}_{step}_{color}_{unit}"
-    #cache_key = "legend_" + hashlib.md5(cache_params.encode()).hexdigest()
-    cache_key = "legend_%s_%s" % (layer_map, hashlib.md5(cache_params.encode()).hexdigest())
-    cache_path = STATIC_DIR / "legend" / f"{cache_key}.png"
-
-    # Return cached file if exists and caching is enabled
-    if use_cache and cache_path.exists():
-        return FileResponse(cache_path, media_type="image/png")
+async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min_color: float = 0.0,max_color: float = 0.0,step: float = 0.0,color: str = '',unit: str = '',use_cache: bool = False):
+    # Always generate the legend fresh (no caching) and return it from memory.
+    def _legend_response(figure):
+        buf = io.BytesIO()
+        figure.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1, dpi=150, facecolor='white')
+        plt.close(figure)
+        buf.seek(0)
+        return Response(content=buf.getvalue(), media_type="image/png", headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
     fig, ax = plt.subplots(figsize=(6, 1), facecolor='white')
     fig.subplots_adjust(bottom=0.5)
@@ -471,9 +479,9 @@ async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min
         
     elif mode == 'marine_heat_wave':
         # Marine Heat Wave configuration
-        colors = ['#B0E0E6', '#FFFF00', '#FFA500', '#FF0000', '#8B0000']
-        labels = ['0', '1', '2', '3', '4']
-        bounds = [0, 1, 2, 3, 4, 5]
+        colors = [ '#b3f3ff', '#fcff7f','#f7b333', '#f68101', '#cc4c00','#981900']
+        labels = ['No Marine\nHeatwave', 'Moderate', 'Strong', 'Severe','Extreme','Beyond \nExtreme']
+        bounds = [0, 1, 2, 3, 4, 5,6]
         title = 'Marine Heat Wave Level'
         
     elif mode == 'decile':
@@ -505,17 +513,7 @@ async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min
         # Corrected this line - using set_ticklabels instead of set_xticklabels
         cb.set_ticklabels([f'{tick:g}' for tick in ticks])
         cb.set_label(unit, labelpad=10)
-        buf = io.BytesIO()
-        plt.savefig(cache_path, bbox_inches='tight', pad_inches=0.1, dpi=150, facecolor='white')
-        plt.close()
-        
-        if use_cache:
-            return FileResponse(cache_path, media_type="image/png")
-        else:
-            return FileResponse(cache_path, media_type="image/png", headers={"Cache-Control": "no-store"})
-
-        #plt.savefig(fname, bbox_inches='tight', pad_inches=0.1, dpi=200, facecolor='white')
-        #plt.close()
+        return _legend_response(fig)
 
     # Create discrete colormap for categorical data
     cmap = ListedColormap(colors)
@@ -553,17 +551,8 @@ async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min
     else:
         cb.ax.tick_params(labelsize=9)
 
-    # Save with white background
-    buf = io.BytesIO()
-    plt.savefig(cache_path, bbox_inches='tight', pad_inches=0.1, dpi=150, facecolor='white')
-    plt.close()
-
-    # Return the cached file
-    if use_cache:
-        return FileResponse(cache_path, media_type="image/png")
-    else:
-        # If not using cache, return with headers to prevent client caching
-        return FileResponse(cache_path, media_type="image/png", headers={"Cache-Control": "no-store"})
+    # Return the freshly generated legend from memory (no caching)
+    return _legend_response(fig)
 
 #CALCULATE MIN MAX TIDE HISTORICAL DATA
 @ocean_router.get("/tide_hindcast")

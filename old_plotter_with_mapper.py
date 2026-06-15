@@ -2080,7 +2080,7 @@ layer_map_data = fetch_wms_layer_data(layer_id)
 time = demo_time(layer_map_data)
 time = "2025-05-25T00:00:00Z"
 time = "2025-05-01T00:00:00Z"
-time = "2025-01-01T00:00:00Z"
+time = "2024-01-01T00:00:00Z"
 #time = "2025-08-05T00:00:00Z"
 #SLA Daily
 #time = "2025-07-16T00:00:00Z"

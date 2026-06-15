@@ -1688,9 +1688,10 @@ class Plotter:
             cbar.set_ticks(ticks)
             cbar.set_ticklabels(colorbar_labels)
             cbar.ax.tick_params(labelsize=6)
-            
+            cbar.ax.minorticks_off()
+
             return cs, cbar
-            
+
         except Exception as e:
             raise RuntimeError(f"Error plotting coral bleaching data: {str(e)}")
 
@@ -1722,34 +1723,33 @@ class Plotter:
                     segments.append((val, val))  # Treat single values as range with equal start/end
             
             # Create colormap with exactly N colors for N segments
+            n_segments = len(segments)
             cmap = mcolors.ListedColormap(cmap_colors)
-            
-            # Create normalization that maps each segment to one color
-            # We'll use the midpoint of each segment to determine color mapping
-            norm = mcolors.Normalize(vmin=min(s[0] for s in segments), 
-                                vmax=max(s[1] for s in segments))
-            
+
+            # Use integer bounds [0, 1, ..., N] so each segment is one equal-width
+            # color band, and ticks land exactly in the middle of each band.
+            bounds = np.arange(n_segments + 1)
+            norm = mcolors.BoundaryNorm(bounds, cmap.N)
+            ticks = bounds[:-1] + 0.5
+
             # Create plot - we'll manually map values to colors
             # First, create an array where each value is mapped to its segment index
             segment_idx = np.zeros_like(bleaching_data, dtype=int)
             for i, (start, end) in enumerate(segments):
                 mask = (bleaching_data >= start) & (bleaching_data <= end)
                 segment_idx[mask] = i
-            
+
             # Now plot using the segment indices
             cs = ax.pcolormesh(lons, lats, segment_idx,
-                            cmap=cmap, 
-                            vmin=0, vmax=len(segments)-1,
+                            cmap=cmap, norm=norm,
                             shading='auto')
-            
-            # Calculate midpoints for ticks
-            ticks = [(seg[0] + seg[1])/2 for seg in segments]
-            
+
             # Create colorbar
             cbar = plt.colorbar(cs, cax=ax_legend)
-            cbar.set_ticks(np.arange(len(segments)))  # One tick per segment
+            cbar.set_ticks(ticks)  # One centered tick per segment
             cbar.set_ticklabels(colorbar_labels)
             cbar.ax.tick_params(labelsize=6)
+            cbar.ax.minorticks_off()
             
             # Adjust label rotation if needed
             for label in cbar.ax.get_xticklabels():
