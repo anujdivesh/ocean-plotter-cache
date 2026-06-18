@@ -458,7 +458,7 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
 
 #LEGEND FOR OCEAN PORTAL
 @ocean_router.get("/GetLegendGraphic")
-async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min_color: float = 0.0,max_color: float = 0.0,step: float = 0.0,color: str = '',unit: str = '',use_cache: bool = False):
+async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min_color: float = 0.0,max_color: float = 0.0,step: float = 0.0,color: str = '',unit: str = '',use_cache: bool = False,no_zero: bool = False):
     # Always generate the legend fresh (no caching) and return it from memory.
     def _legend_response(figure):
         buf = io.BytesIO()
@@ -500,7 +500,10 @@ async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min
         cmap = getattr(plt.cm, color)
         norm = mpl.colors.Normalize(vmin=float(min_color), vmax=float(max_color))
         ticks = np.arange(float(min_color), float(max_color) + float(step)/2, float(step))
-        
+        # Optionally drop the zero tick from the colorbar
+        if no_zero:
+            ticks = ticks[~np.isclose(ticks, 0.0)]
+
         cb = mpl.colorbar.ColorbarBase(
             ax,
             cmap=cmap,
