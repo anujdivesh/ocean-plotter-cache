@@ -599,6 +599,32 @@ class Plotter:
                         end_date = start_date + relativedelta(months=2)
                         formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
                         title_suffix = "%s : %s" % (cleaned, formatted_range)
+                elif "Trend" in layer_map_data.get_map_names[0]:
+                    if "66" in layer_map_data.get_map_names[0]:
+                        cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('66', '')
+                        formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                        date_str = layer_map_data.get_map_names[1]
+                        start_date = date
+                        end_date = start_date + relativedelta(months=5)
+                        formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                        title_suffix = "%s : %s" % (cleaned, formatted_range)
+                    elif "122" in layer_map_data.get_map_names[0]:
+                        cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('122', '')
+                        formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                        date_str = layer_map_data.get_map_names[1]
+                        start_date = date
+                        end_date = start_date + relativedelta(months=11)
+                        formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                        title_suffix = "%s : %s" % (cleaned, formatted_range)
+                    elif "33" in layer_map_data.get_map_names[0]:
+                        cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '').replace('33', '')
+                        formatted_date = date.strftime(layer_map_data.get_map_names[1])
+                        date_str = layer_map_data.get_map_names[1]
+                        start_date = date
+                        end_date = start_date + relativedelta(months=2)
+                        formatted_range = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
+                        title_suffix = "%s : %s" % (cleaned, formatted_range)
+                
                 else:    
                     cleaned = layer_map_data.get_map_names[0].replace('{', '').replace('}', '')
                     if "Seasonal" in cleaned:
