@@ -1079,8 +1079,9 @@ class Plotter:
         import numpy as np
         import matplotlib.pyplot as plt
 
-        # Create fixed levels for contours
-        levels = np.arange(min_color_plot, max_color_plot, steps)
+        # Create fixed levels for contours (include the max endpoint so the
+        # colorbar reaches max_color_plot)
+        levels = np.arange(min_color_plot, max_color_plot + steps, steps)
 
         # Determine number of decimal places in "steps"
         steps_str = str(steps)
@@ -1100,7 +1101,27 @@ class Plotter:
             extend='both'  # Adds arrows if data exceeds min/max
         )
         cbar = plt.colorbar(cs, cax=ax_legend)
-        
+
+        # No tick marks/dots on the colorbar, keep only labels
+        cbar.ax.minorticks_off()
+        cbar.ax.tick_params(length=0, which='both')
+
+        # Even ticks with the min pinned to the bottom and the max to the top.
+        # Small ranges step by 0.5, medium by 1, large by 2 (to avoid clutter).
+        cbar_range = max_color_plot - min_color_plot
+        if cbar_range > 0:
+            if cbar_range <= 5:
+                tick_step = 0.5
+            elif cbar_range <= 10:
+                tick_step = 1
+            else:
+                tick_step = 2
+            even_ticks = list(np.arange(min_color_plot, max_color_plot, tick_step))
+            if not even_ticks or abs(even_ticks[-1] - max_color_plot) > tick_step * 1e-6:
+                even_ticks.append(max_color_plot)
+        else:
+            even_ticks = list(levels)
+
         if is_imperial_layer and re.search(r'\bm\b', units.lower()):
             # Convert current tick values from meters to feet
             current_ticks = cbar.get_ticks()
@@ -1198,10 +1219,13 @@ class Plotter:
             )
         else:
             units_label = units
-            cbar.set_ticks(levels)  # Same ticks as contour levels
+            cbar.set_ticks(even_ticks)  # Even ticks pinned to min/max
 
-            # Format tick labels to match the number of decimals in steps
-            tick_labels = [f"{level:.{n_decimals}f}" for level in levels]
+            # Clean labels: whole numbers as ints, else compact (e.g. 0.5)
+            tick_labels = [
+                f"{t:.0f}" if float(t).is_integer() else f"{t:g}"
+                for t in even_ticks
+            ]
             cbar.set_ticklabels(tick_labels)
 
             cbar.ax.tick_params(labelsize=8, pad=tick_pad)
@@ -1254,8 +1278,9 @@ class Plotter:
         import numpy as np
         import matplotlib.pyplot as plt
 
-        # Create fixed levels for contours
-        levels = np.arange(min_color_plot, max_color_plot, steps)
+        # Create fixed levels for contours (include the max endpoint so the
+        # colorbar reaches max_color_plot)
+        levels = np.arange(min_color_plot, max_color_plot + steps, steps)
 
         # Determine number of decimal places in "steps"
         steps_str = str(steps)
@@ -1513,12 +1538,13 @@ class Plotter:
     def plot_filled_pcolor(ax, ax_legend, lon, lat, data, 
                     min_color_plot, max_color_plot, steps,
                     cmap_name='RdBu_r', units='(°C)'):
-        # Create fixed levels for color normalization
-        levels = np.arange(min_color_plot, max_color_plot, steps)
-        
+        # Create fixed levels for color normalization (include the max endpoint
+        # so the colorbar reaches max_color_plot)
+        levels = np.arange(min_color_plot, max_color_plot + steps, steps)
+
         # Create a BoundaryNorm to discretize the colorbar
         norm = BoundaryNorm(levels, ncolors=256, clip=True)
-        
+
         # Plot pcolor with fixed levels
         pc = ax.pcolormesh(
             lon, lat, data,
@@ -1526,11 +1552,31 @@ class Plotter:
             cmap=cmap_name,
             shading='auto'  # Can be 'nearest', 'flat', 'auto', etc.
         )
-        
+
         # Add colorbar with matching ticks
         cbar = plt.colorbar(pc, cax=ax_legend)
-        cbar.set_ticks(levels)  # Same ticks as contour levels
-        cbar.ax.tick_params(labelsize=7)
+        # Even ticks with the min pinned to the bottom and the max to the top.
+        # Small ranges step by 0.5, medium by 1, large by 2 (to avoid clutter).
+        cbar_range = max_color_plot - min_color_plot
+        if cbar_range > 0:
+            if cbar_range <= 5:
+                tick_step = 0.5
+            elif cbar_range <= 10:
+                tick_step = 1
+            else:
+                tick_step = 2
+            ticks = list(np.arange(min_color_plot, max_color_plot, tick_step))
+            if not ticks or abs(ticks[-1] - max_color_plot) > tick_step * 1e-6:
+                ticks.append(max_color_plot)
+            cbar.set_ticks(ticks)
+            cbar.set_ticklabels([
+                f"{t:.0f}" if float(t).is_integer() else f"{t:g}" for t in ticks
+            ])
+        else:
+            cbar.set_ticks(levels)  # Same ticks as contour levels
+        # No tick marks/dots on the colorbar, keep only labels
+        cbar.ax.minorticks_off()
+        cbar.ax.tick_params(labelsize=7, length=0, which='both')
         cbar.set_label(
             units,
             fontsize=6,
@@ -1556,8 +1602,9 @@ class Plotter:
         # Create grid coordinates
         x, y = m(*np.meshgrid(lon, lat))
         
-        # Create levels and normalization
-        levels = np.arange(min_color_plot, max_color_plot, steps)
+        # Create levels and normalization (include the max endpoint so the
+        # colorbar reaches max_color_plot instead of stopping one step short)
+        levels = np.arange(min_color_plot, max_color_plot + steps, steps)
         norm = BoundaryNorm(levels, ncolors=256)
         
         # Plot wave height field
@@ -1569,6 +1616,22 @@ class Plotter:
         )
         
         cbar = plt.colorbar(cs, cax=ax_legend)
+
+        # Evenly spaced tick values with the min pinned to the bottom and the
+        # max pinned to the top of the colorbar. Small ranges step by 0.5,
+        # medium by 1, large by 2 (to avoid clutter).
+        cbar_range = max_color_plot - min_color_plot
+        if cbar_range > 0:
+            if cbar_range <= 5:
+                tick_step = 0.5
+            elif cbar_range <= 10:
+                tick_step = 1
+            else:
+                tick_step = 2
+            ticks = list(np.arange(min_color_plot, max_color_plot, tick_step))
+            if not ticks or abs(ticks[-1] - max_color_plot) > tick_step * 1e-6:
+                ticks.append(max_color_plot)
+            cbar.set_ticks(ticks)
 
         if is_imperial_layer and 'm' in units.lower():
             # Convert current tick values from meters to feet
@@ -1591,6 +1654,13 @@ class Plotter:
             cbar.set_ticklabels(feet_labels)
             units_label = '(ft)'
         else:
+            # Clean up metric tick labels so whole numbers don't show as "2.0"
+            metric_ticks = cbar.get_ticks()
+            metric_labels = [
+                f"{t:.0f}" if float(t).is_integer() else f"{t:g}"
+                for t in metric_ticks
+            ]
+            cbar.set_ticklabels(metric_labels)
             units_label = units
 
         cbar.set_label(
@@ -1619,8 +1689,11 @@ class Plotter:
                         '', labelpos='E',
                         coordinates='axes', fontproperties={'size': 9},
                         labelsep=0.05, labelcolor='black')
-        cbar.ax.tick_params(labelsize=8)
-        
+        # Remove the little tick marks/dots on the colorbar (major and minor),
+        # keep only the labels
+        cbar.ax.minorticks_off()
+        cbar.ax.tick_params(labelsize=8, length=0, which='both')
+
         return cs, q, cbar
 
     """
@@ -1637,8 +1710,9 @@ class Plotter:
         # Create grid coordinates
         x, y = m(*np.meshgrid(lon, lat))
         
-        # Create levels and normalization
-        levels = np.arange(min_color_plot, max_color_plot, steps)
+        # Create levels and normalization (include the max endpoint so the
+        # colorbar reaches max_color_plot instead of stopping one step short)
+        levels = np.arange(min_color_plot, max_color_plot + steps, steps)
         norm = BoundaryNorm(levels, ncolors=256)
         
         # Plot wave height field

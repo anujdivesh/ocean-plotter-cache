@@ -122,10 +122,10 @@ def read_root():
 
 #MAPS FOR OCEAN PORTAL
 @ocean_router.get("/getMap")
-async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True,token: str = 'null',unit: str = 'metric'):
+async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True,token: str = 'null',unit: str = 'metric',minColor: float = None,maxColor: float = None):
     # Generate unique filename based on parameters
     time = re.sub(r'\.\d{3}', '', time)
-    params_hash = hashlib.md5(f"{region}_{layer_map}_{time}".encode()).hexdigest()
+    params_hash = hashlib.md5(f"{region}_{layer_map}_{time}_{minColor}_{maxColor}".encode()).hexdigest()
     filename = "plot_%s_%s_%s_%s.png" % (region,layer_map,unit,params_hash)
     #filename = f"plot_{params_hash}.png"
     filepath = STATIC_DIR / "maps" / filename
@@ -189,6 +189,17 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         dap_url, dap_variable = Plotter.get_dap_config(layer_map_data)
         title, dataset_text = Plotter.get_title(layer_map_data,time)
         cmap_name, plot_type, min_color_plot, max_color_plot, steps, units, levels, discrete = Plotter.get_plot_config(layer_map_data)
+        # Optional min/max colorbar overrides from the URL, applied only to the
+        # supported plot types.
+        if plot_type in ("wave_with_dir", "pcolormesh", "contourf"):
+            if minColor is not None:
+                min_color_plot = minColor
+            if maxColor is not None:
+                max_color_plot = maxColor
+            else:
+                # No max override: floor the default max to the nearest lower
+                # whole number so the colorbar ends on a clean value.
+                max_color_plot = int(np.floor(max_color_plot))
         west_bound, east_bound, south_bound, north_bound, country_name, short_name = Plotter.getBBox(region)
         if short_name == "PAC":
             resolution = "l"
