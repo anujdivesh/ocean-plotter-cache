@@ -1110,12 +1110,16 @@ class Plotter:
         # Small ranges step by 0.5, medium by 1, large by 2 (to avoid clutter).
         cbar_range = max_color_plot - min_color_plot
         if cbar_range > 0:
-            if cbar_range <= 5:
-                tick_step = 0.5
-            elif cbar_range <= 10:
-                tick_step = 1
+            # If the contour step is a decimal, use that step for the colorbar ticks
+            if n_decimals > 0:
+                tick_step = steps
             else:
-                tick_step = 2
+                if cbar_range <= 5:
+                    tick_step = 0.5
+                elif cbar_range <= 10:
+                    tick_step = 1
+                else:
+                    tick_step = 2
             even_ticks = list(np.arange(min_color_plot, max_color_plot, tick_step))
             if not even_ticks or abs(even_ticks[-1] - max_color_plot) > tick_step * 1e-6:
                 even_ticks.append(max_color_plot)
