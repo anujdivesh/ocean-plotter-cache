@@ -1225,11 +1225,20 @@ class Plotter:
             units_label = units
             cbar.set_ticks(even_ticks)  # Even ticks pinned to min/max
 
-            # Clean labels: whole numbers as ints, else compact (e.g. 0.5)
-            tick_labels = [
-                f"{t:.0f}" if float(t).is_integer() else f"{t:g}"
-                for t in even_ticks
-            ]
+            # Labels match the precision of 'steps' (0.02 -> "7.80", "8.00",
+            # "8.20"). Derived from the compact form so a whole-number step
+            # stored as 1.0 still counts as zero decimals.
+            steps_compact = f"{float(steps):g}"
+            label_decimals = (
+                len(steps_compact.split('.')[1]) if '.' in steps_compact else 0
+            )
+            if label_decimals > 0:
+                tick_labels = [f"{t:.{label_decimals}f}" for t in even_ticks]
+            else:
+                tick_labels = [
+                    f"{t:.0f}" if float(t).is_integer() else f"{t:g}"
+                    for t in even_ticks
+                ]
             cbar.set_ticklabels(tick_labels)
 
             cbar.ax.tick_params(labelsize=8, pad=tick_pad)

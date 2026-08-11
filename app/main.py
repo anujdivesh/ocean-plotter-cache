@@ -196,9 +196,11 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                 min_color_plot = minColor
             if maxColor is not None:
                 max_color_plot = maxColor
-            else:
+            elif steps >= 1:
                 # No max override: floor the default max to the nearest lower
-                # whole number so the colorbar ends on a clean value.
+                # whole number so the colorbar ends on a clean value. Only safe
+                # for whole-number steps -- fractional-step layers (e.g. pH
+                # 7.8-8.2 by 0.02) must keep their configured max.
                 max_color_plot = int(np.floor(max_color_plot))
         west_bound, east_bound, south_bound, north_bound, country_name, short_name = Plotter.getBBox(region)
         if short_name == "PAC":
@@ -408,9 +410,26 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
                             t.set_horizontalalignment('left')
                         cbar.ax.tick_params(axis='y', pad=2, length=0)
                     else:
-                        cbar.ax.yaxis.set_major_formatter(
-                            FuncFormatter(lambda x, pos: f"{(0.0 if abs(x) < 1e-12 else x):6.1f}".replace("-0.0", "0.0"))
+                        # Tick precision follows the configured step, so a 0.02
+                        # step reads "7.80 ... 8.20" instead of collapsing to
+                        # one decimal. Never below the 1 decimal used before.
+                        step_compact = f"{float(steps):g}"
+                        step_decimals = (
+                            len(step_compact.split('.')[1]) if '.' in step_compact else 0
                         )
+                        cbar_decimals = max(1, step_decimals)
+                        cbar_width = 5 + cbar_decimals  # matches the old '%6.1f' padding
+
+                        def _cbar_fmt(x, pos, d=cbar_decimals, w=cbar_width):
+                            if abs(x) < 1e-12:
+                                x = 0.0
+                            label = f"{x:{w}.{d}f}"
+                            # A tiny negative value must not print as "-0.00"
+                            if float(label) == 0.0:
+                                label = label.replace("-", "")
+                            return label
+
+                        cbar.ax.yaxis.set_major_formatter(FuncFormatter(_cbar_fmt))
                         #cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%6.1f'))
                         for t in cbar.ax.get_yticklabels():
                             t.set_horizontalalignment('left')
@@ -524,8 +543,18 @@ async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min
             ticks=ticks,
             spacing='uniform'
         )
+        # Label precision follows the step, so a 0.02 step reads
+        # "7.80 ... 8.00 ... 8.20"; whole-number steps stay as integers.
+        step_compact = f'{float(step):g}'
+        label_decimals = (
+            len(step_compact.split('.')[1]) if '.' in step_compact else 0
+        )
+        if label_decimals > 0:
+            tick_labels = [f'{tick:.{label_decimals}f}' for tick in ticks]
+        else:
+            tick_labels = [f'{tick:g}' for tick in ticks]
         # Corrected this line - using set_ticklabels instead of set_xticklabels
-        cb.set_ticklabels([f'{tick:g}' for tick in ticks])
+        cb.set_ticklabels(tick_labels)
         cb.set_label(unit, labelpad=10)
         return _legend_response(fig)
 
