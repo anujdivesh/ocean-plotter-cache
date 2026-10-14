@@ -746,7 +746,7 @@ def generate_tide_hindcast(country: str,location: str,station_id: str,use_cache:
         # Add footer text
         ax2_pos = ax.get_position()
         ax.text(
-            -0.08, ax2_pos.y0-0.17, "© Pacific Community (SPC) 2025",
+            -0.08, ax2_pos.y0-0.17, f"© Pacific Community (SPC) {datetime.now().year}",
             transform=ax.transAxes, fontsize=7, verticalalignment='top'
         )
         ax.text(

@@ -490,7 +490,7 @@ class Plotter:
         config = {
             
             # Additional configuration variables
-            "copyright_text": "© Pacific Community (SPC) 2025",
+            "copyright_text": f"© Pacific Community (SPC) {datetime.now().year}",
             "footer_text": "Climate and Ocean Support Program in the Pacific (COSPPac)",
             "app_name": "Ocean Data Viewer",
             "version": "1.2.0",
