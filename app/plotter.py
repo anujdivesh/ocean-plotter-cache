@@ -33,7 +33,90 @@ import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import colors
 import re
+import functools
+from matplotlib.collections import PolyCollection, LineCollection
 matplotlib.use('Agg')  # Non-interactive backend
+
+
+def _closest_time_index(time_values, target_dt):
+    """Index of the time closest to target_dt (vectorised, falls back to a per-element loop)."""
+    try:
+        times = pd.to_datetime(time_values)
+        return int(np.argmin(np.abs((times - pd.Timestamp(target_dt)).total_seconds())))
+    except Exception:
+        time_dt = [pd.to_datetime(t).to_pydatetime() for t in time_values]
+        return int(np.argmin([abs((t - target_dt).total_seconds()) for t in time_dt]))
+
+
+@functools.lru_cache(maxsize=64)
+def _load_coastline_rings(filepath, simplify_tolerance):
+    """Read + simplify a coastline file once; returns exterior rings (lon, lat), incl. +360 copies."""
+    if filepath.endswith('.zip'):
+        gdf = gpd.read_file(f"zip://{filepath}")
+    else:
+        gdf = gpd.read_file(filepath)
+
+    if gdf.crs is None:
+        gdf = gdf.set_crs('EPSG:4326', allow_override=True)
+    else:
+        gdf = gdf.to_crs('EPSG:4326')
+
+    if simplify_tolerance and simplify_tolerance > 0:
+        gdf['geometry'] = gdf['geometry'].simplify(tolerance=simplify_tolerance)
+
+    rings = []
+    for geom in gdf.geometry:
+        if not geom.is_valid:
+            geom = geom.buffer(0)  # Fix invalid geometries
+
+        if geom.geom_type == 'Polygon':
+            geoms = [geom]
+        elif geom.geom_type == 'MultiPolygon':
+            geoms = list(geom.geoms)
+        else:
+            continue
+
+        for poly in geoms:
+            lon, lat = (np.asarray(c) for c in poly.exterior.coords.xy)
+            rings.append((lon, lat))
+            rings.append((lon + 360, lat))  # Shifted copy to handle the dateline
+    return tuple(rings)
+
+
+@functools.lru_cache(maxsize=64)
+def _load_eez_lines(local_path):
+    """Read an EEZ file once; returns its boundary lines as (lon, lat) arrays."""
+    if local_path.endswith('.zip'):
+        gdf = gpd.read_file(f"zip://{local_path}")
+    else:
+        gdf = gpd.read_file(local_path)
+
+    if gdf.crs is None:
+        gdf = gdf.set_crs('EPSG:4326', allow_override=True)
+    else:
+        gdf = gdf.to_crs('EPSG:4326')
+
+    lines = []
+    for geom in gdf.geometry:
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+        if geom.geom_type == 'LineString':
+            parts = [geom.xy]
+        elif geom.geom_type == 'MultiLineString':
+            parts = [line.xy for line in geom.geoms]
+        elif geom.geom_type == 'Polygon':
+            parts = [geom.exterior.xy]
+        elif geom.geom_type == 'MultiPolygon':
+            parts = [poly.exterior.xy for poly in geom.geoms]
+        else:
+            continue  # Other geometry types are ignored
+        lines.extend((np.asarray(x), np.asarray(y)) for x, y in parts)
+    return tuple(lines)
+
+
+@functools.lru_cache(maxsize=4)
+def _load_city_names(city_file):
+    return pd.read_json(city_file)
 plt.switch_backend('Agg') 
 
 class Plotter:
@@ -78,17 +161,16 @@ class Plotter:
 
                 # Check if "time" dimension exists
                 if "time" in ds.dims or "time" in ds.coords:
+                    # Convert target time to datetime object
+                    target_dt = datetime.strptime(target_time, "%Y-%m-%dT%H:%M:%SZ")
+
                     # Get available times (handle bytes if needed)
                     if isinstance(ds.time.values[0], bytes):
                         time_str = [t.decode('utf-8') for t in ds.time.values]
                         time_dt = np.array([datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ") for t in time_str])
+                        time_index = np.argmin([abs((t - target_dt).total_seconds()) for t in time_dt])
                     else:
-                        time_dt = [pd.to_datetime(t).to_pydatetime() for t in ds.time.values]
-
-                    # Convert target time to datetime object
-                    target_dt = datetime.strptime(target_time, "%Y-%m-%dT%H:%M:%SZ")
-                    # Find closest time index
-                    time_index = np.argmin([abs((t - target_dt).total_seconds()) for t in time_dt])
+                        time_index = _closest_time_index(ds.time.values, target_dt)
 
                     data = ds[variable_name].isel(time=time_index)
                 else:
@@ -146,46 +228,20 @@ class Plotter:
         - simplify_tolerance: tolerance for geometry simplification
         """
         try:
-            # Detect zipped shapefile
-            if filepath.endswith('.zip'):
-                gdf = gpd.read_file(f"zip://{filepath}")
+            # Parsed geometry is cached per file, so shapefiles are only read once per worker
+            rings = _load_coastline_rings(str(filepath), simplify_tolerance)
+
+            segments = []
+            for lon, lat in rings:
+                x, y = m(lon, lat)
+                segments.append(np.column_stack((x, y)))
+
+            # One collection instead of one artist per polygon
+            if style == 'polygon':
+                coll = PolyCollection(segments, facecolors='#A9A9A9', edgecolors='black', linewidths=0.5, zorder=2)
             else:
-                gdf = gpd.read_file(filepath)
-
-            # Ensure correct CRS (EPSG:4326)
-            if gdf.crs is None:
-                gdf = gdf.set_crs('EPSG:4326', allow_override=True)
-            else:
-                gdf = gdf.to_crs('EPSG:4326')
-
-            # Simplify complex geometries if needed
-            if simplify_tolerance and simplify_tolerance > 0:
-                gdf['geometry'] = gdf['geometry'].simplify(tolerance=simplify_tolerance)
-
-            # Plot with dateline handling
-            for geom in gdf.geometry:
-                if not geom.is_valid:
-                    geom = geom.buffer(0)  # Fix invalid geometries
-
-                if geom.geom_type == 'Polygon':
-                    geoms = [geom]
-                elif geom.geom_type == 'MultiPolygon':
-                    geoms = list(geom.geoms)
-                else:
-                    continue
-
-                for poly in geoms:
-                    # Original and shifted version to handle dateline
-                    original = gpd.GeoSeries([poly], crs='EPSG:4326')
-                    shifted = original.translate(xoff=360)
-                    combined = pd.concat([original, shifted])
-
-                    for part in combined:
-                        x, y = m(part.exterior.coords.xy[0], part.exterior.coords.xy[1])
-                        if style == 'polygon':
-                            ax.fill(x, y, color='#A9A9A9', ec='black', lw=0.5, zorder=2)
-                        else:
-                            ax.plot(x, y, color='black', lw=0.5, zorder=2)
+                coll = LineCollection(segments, colors='black', linewidths=0.5, zorder=2)
+            ax.add_collection(coll, autolim=False)
 
         except Exception as e:
             print(f"Error plotting coastline from local file: {str(e)}")
@@ -363,73 +419,55 @@ class Plotter:
         - geojson_url: URL to fetch GeoJSON from GeoServer
         - color, linewidth, linestyle: plot properties
         """
-        gdf = None
+        lines = None
 
-        # Try reading from local file first, if provided
+        # Try reading from local file first, if provided (parsed geometry is cached per file)
         if local_path is not None and os.path.exists(local_path):
             try:
-                # Support for zipped shapefiles
-                if local_path.endswith('.zip'):
-                    gdf = gpd.read_file(f"zip://{local_path}")
-                else:
-                    gdf = gpd.read_file(local_path)
+                lines = _load_eez_lines(str(local_path))
             except Exception as e:
                 print(f"Failed to read local file {local_path}: {e}")
 
         # If no local data or failed, try GeoServer
-        if gdf is None and geojson_url is not None:
+        if lines is None and geojson_url is not None:
             try:
-                geojson_response = requests.get(geojson_url)
+                geojson_response = requests.get(geojson_url, timeout=60)
                 if geojson_response.status_code == 200:
                     geojson_data = geojson_response.json()
                     gdf = gpd.GeoDataFrame.from_features(geojson_data['features'])
+                    lines = []
+                    for geom in gdf.geometry:
+                        if not geom.is_valid:
+                            geom = geom.buffer(0)
+                        if geom.geom_type == 'LineString':
+                            lines.append(geom.xy)
+                        elif geom.geom_type == 'MultiLineString':
+                            lines.extend(line.xy for line in geom.geoms)
+                        elif geom.geom_type == 'Polygon':
+                            lines.append(geom.exterior.xy)
+                        elif geom.geom_type == 'MultiPolygon':
+                            lines.extend(poly.exterior.xy for poly in geom.geoms)
                 else:
                     print(f"Failed to retrieve GeoJSON from {geojson_url}")
             except Exception as e:
                 print(f"Error fetching GeoJSON from {geojson_url}: {e}")
 
         # If we still have no data, abort
-        if gdf is None:
+        if lines is None:
             print("No EEZ data available to plot.")
             return
 
-        # Ensure correct CRS
-        if gdf.crs is None:
-            gdf = gdf.set_crs('EPSG:4326', allow_override=True)
-        else:
-            gdf = gdf.to_crs('EPSG:4326')
-
-        # Plot boundaries, handling LineString, MultiLineString, Polygon, MultiPolygon and dateline wrap
-        for geom in gdf.geometry:
-            if not geom.is_valid:
-                geom = geom.buffer(0)
-            # LineString
-            if geom.geom_type == 'LineString':
-                x, y = m(*geom.xy)
-                x = np.array(x)
-                x = np.where(x < 0, x + 360, x)
-                ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
-            # MultiLineString
-            elif geom.geom_type == 'MultiLineString':
-                for line in geom.geoms:
-                    x, y = m(*line.xy)
-                    x = np.array(x)
-                    x = np.where(x < 0, x + 360, x)
-                    ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
-            # Polygon
-            elif geom.geom_type == 'Polygon':
-                x, y = m(*geom.exterior.xy)
-                x = np.array(x)
-                x = np.where(x < 0, x + 360, x)
-                ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
-            # MultiPolygon
-            elif geom.geom_type == 'MultiPolygon':
-                for poly in geom.geoms:
-                    x, y = m(*poly.exterior.xy)
-                    x = np.array(x)
-                    x = np.where(x < 0, x + 360, x)
-                    ax.plot(x, y, marker=None, color=color, linewidth=linewidth, linestyle=linestyle)
-            # Other geometry types will be ignored
+        # Plot boundaries with dateline wrap, as a single collection
+        segments = []
+        for lon, lat in lines:
+            x, y = m(np.asarray(lon), np.asarray(lat))
+            x = np.array(x)
+            x = np.where(x < 0, x + 360, x)
+            segments.append(np.column_stack((x, y)))
+        ax.add_collection(
+            LineCollection(segments, colors=color, linewidths=linewidth, linestyles=linestyle, zorder=2),
+            autolim=False
+        )
 
     @staticmethod
     def cm2inch(*tupl):
@@ -2212,7 +2250,7 @@ class Plotter:
     def plot_city_names(ax, m, short_name, city_file='config/pac_names.json'):
 
         # Load city data
-        cities = pd.read_json(city_file)
+        cities = _load_city_names(str(city_file))
 
         # Filter for the selected country's cities
         filtered_cities = cities[cities['country_code'] == short_name]

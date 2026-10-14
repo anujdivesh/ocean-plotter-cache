@@ -38,9 +38,20 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY . .
 
 # Set environment variables
+# - *_NUM_THREADS=1: stop numpy/scipy BLAS spawning one thread per CPU core in every worker
+# - WEB_CONCURRENCY: gunicorn worker count (override from docker-compose)
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    MPLBACKEND=Agg \
+    OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    MALLOC_ARENA_MAX=2 \
+    WEB_CONCURRENCY=3
+
+# Build the matplotlib font cache once at build time instead of on first request
+RUN python -c "import matplotlib.pyplot"
 
 # Create static directory with correct permissions
 RUN mkdir -p /app/static && \
@@ -70,12 +81,14 @@ EXPOSE 8000
 
 # Optimized Uvicorn command
 #CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+# Worker count comes from WEB_CONCURRENCY. --preload imports the heavy libraries
+# (matplotlib, basemap, geopandas, xarray) once and shares them with the workers.
+# --max-requests recycles workers regularly to release memory matplotlib holds on to.
 CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8000", \
-     "--workers", "8", \
-     "--threads", "2", \
+     "--preload", \
      "--timeout", "120", \
      "--keep-alive", "60", \
-     "--max-requests", "1000", \
+     "--max-requests", "300", \
      "--max-requests-jitter", "50", \
      "app.main:app"]

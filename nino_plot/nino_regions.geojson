@@ -1,0 +1,69 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Nino 1+2"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [270, 0],
+          [280, 0],
+          [280, -10],
+          [270, -10],
+          [270, 0]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Nino 3"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [210, 5],
+          [270, 5],
+          [270, -5],
+          [210, -5],
+          [210, 5]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Nino 3.4"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [190, 5],
+          [240, 5],
+          [240, -5],
+          [190, -5],
+          [190, 5]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Nino 4"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [160, 5],
+          [210, 5],
+          [210, -5],
+          [160, -5],
+          [160, 5]
+        ]]
+      }
+    }
+  ]
+}

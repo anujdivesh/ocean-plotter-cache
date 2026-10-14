@@ -19,8 +19,7 @@ services:
       - /mnt/data/ocean_portal/datasets:/app/datasets
     environment:
       - RELOAD=${RELOAD:-false}
-      - WORKERS=${WORKERS:-1} #6
-      - UVICORN_WORKERS=${WORKERS:-1}  # Explicit worker count 6
+      - WEB_CONCURRENCY=${WORKERS:-3}  # gunicorn worker count (each worker is a full copy of the plotting stack)
       - UVICORN_TIMEOUT_KEEP_ALIVE=60  # Keep-alive timeout
     restart: unless-stopped
     healthcheck:

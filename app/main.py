@@ -39,6 +39,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 from matplotlib.ticker import FormatStrFormatter, FuncFormatter
 from matplotlib import colors
 import re
+import functools
+import threading
 
 app = FastAPI(
     docs_url="/plotter/docs",
@@ -46,7 +48,22 @@ app = FastAPI(
     openapi_url="/plotter/openapi.json",
     favicon_url="/plotter/favicon.ico"
 )
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+# No GZipMiddleware: almost every response is a PNG, which is already compressed,
+# so gzipping it only burned CPU on every request.
+
+# pyplot is not thread-safe, so plotting endpoints run in the threadpool (keeping
+# the event loop free to serve cached files) but one at a time per worker.
+PLOT_LOCK = threading.Lock()
+
+def serialized(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        with PLOT_LOCK:
+            return fn(*args, **kwargs)
+    return wrapper
+
+# One shared HTTP client (connection pooling) instead of one per request
+http_client = httpx.AsyncClient(timeout=30.0)
 
 # Configure CORS
 app.add_middleware(
@@ -122,7 +139,8 @@ def read_root():
 
 #MAPS FOR OCEAN PORTAL
 @ocean_router.get("/getMap")
-async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True,token: str = 'null',unit: str = 'metric',minColor: float = None,maxColor: float = None):
+@serialized
+def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: str = '2025-05-14T12:00:00Z',use_cache: bool = True,token: str = 'null',unit: str = 'metric',minColor: float = None,maxColor: float = None):
     # Generate unique filename based on parameters
     time = re.sub(r'\.\d{3}', '', time)
     params_hash = hashlib.md5(f"{region}_{layer_map}_{time}_{minColor}_{maxColor}".encode()).hexdigest()
@@ -468,32 +486,37 @@ async def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,ti
         Plotter.plot_city_names(ax2,m,short_name, Path(__file__).parent.parent / "app" / "config" / "pac_names.json")
         # Save directly to file if caching
         if use_cache:
-            plt.savefig(filepath, format="png", bbox_inches='tight', pad_inches=0.1, dpi=300)
-            plt.close(fig)
+            fig.savefig(filepath, format="png", bbox_inches='tight', pad_inches=0.1, dpi=300)
             return FileResponse(filepath, media_type="image/png")
         else:
             # If not using cache, use BytesIO
             buf = io.BytesIO()
-            plt.savefig(buf, format="png", bbox_inches='tight', pad_inches=0.1, dpi=300)
-            plt.close(fig)
+            fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0.1, dpi=300)
             buf.seek(0)
             return StreamingResponse(buf, media_type="image/png", headers={"Cache-Control": "no-store"})
     except Exception as e:
-        plt.close('all')  # Ensure all figures are closed on error
         #message = "There is issues plotting Layer %s, region %s, time %s, unit %s. \n %s Vinaka.." % (layer_map,region, time, unit,str(e))
         #SPCMailer.send_notification_email_sync( to="divesha@spc.int",
         #    subject="Ocean plotter",
         #    body=message)
         return {"error": str(e)}
+    finally:
+        plt.close('all')  # Never leave figures in pyplot's registry (memory leak)
 
 #LEGEND FOR OCEAN PORTAL
 @ocean_router.get("/GetLegendGraphic")
-async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min_color: float = 0.0,max_color: float = 0.0,step: float = 0.0,color: str = '',unit: str = '',use_cache: bool = False,no_zero: bool = False):
+@serialized
+def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min_color: float = 0.0,max_color: float = 0.0,step: float = 0.0,color: str = '',unit: str = '',use_cache: bool = False,no_zero: bool = False):
+    try:
+        return _generate_legend(mode, min_color, max_color, step, color, unit, no_zero)
+    finally:
+        plt.close('all')  # Also closes the figure when an exception is raised
+
+def _generate_legend(mode, min_color, max_color, step, color, unit, no_zero):
     # Always generate the legend fresh (no caching) and return it from memory.
     def _legend_response(figure):
         buf = io.BytesIO()
         figure.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1, dpi=150, facecolor='white')
-        plt.close(figure)
         buf.seek(0)
         return Response(content=buf.getvalue(), media_type="image/png", headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
@@ -599,7 +622,8 @@ async def generate_legend(request: Request,layer_map: int = 1,mode: str = '',min
 
 #CALCULATE MIN MAX TIDE HISTORICAL DATA
 @ocean_router.get("/tide_hindcast")
-async def generate_tide_hindcast(country: str,location: str,station_id: str,use_cache: bool = False):
+@serialized
+def generate_tide_hindcast(country: str,location: str,station_id: str,use_cache: bool = False):
     """
     Replacement for ocean-cgi.spc.int/cgi-bin/tide_hindcast.py
     Example request: /tide_hindcast?country=Fiji&location=Suva&station_id=IDO70063
@@ -618,7 +642,7 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
         url = f"http://reg.bom.gov.au/ntc/{station_id}/{station_id}SLD.txt"
         temp_file = STATIC_DIR / "tide" / f"{station_id}SLD.txt"
         
-        response = requests.get(url)
+        response = requests.get(url, timeout=60)
         response.raise_for_status()
         with open(temp_file, 'w', encoding='utf-8') as f:
             f.write(response.text)
@@ -741,8 +765,7 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
         
 
         # Save to cache
-        plt.savefig(cache_path, dpi=300)
-        plt.close()
+        fig.savefig(cache_path, dpi=300)
 
         return FileResponse(
             cache_path,
@@ -755,23 +778,23 @@ async def generate_tide_hindcast(country: str,location: str,station_id: str,use_
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Plot generation failed: {str(e)}")
     finally:
+        plt.close('all')
         if 'temp_file' in locals() and temp_file.exists():
             temp_file.unlink()
 
 @ocean_router.get("/proxy")
 async def proxy(url: str = Query(..., description="Full URL to proxy")):
-    async with httpx.AsyncClient() as client:
-        try:
-            r = await client.get(url)
-            # Always return 200 OK
-            return Response(
-                content=r.content,
-                status_code=200,
-                media_type=r.headers.get("content-type", "application/octet-stream"),
-            )
-        except Exception:
-            # On error, return 200 OK with empty content
-            return Response(content=b"", status_code=200, media_type="application/octet-stream")
+    try:
+        r = await http_client.get(url)
+        # Always return 200 OK
+        return Response(
+            content=r.content,
+            status_code=200,
+            media_type=r.headers.get("content-type", "application/octet-stream"),
+        )
+    except Exception:
+        # On error, return 200 OK with empty content
+        return Response(content=b"", status_code=200, media_type="application/octet-stream")
 #CACHE EEZ
 GEOSERVER_URL = "https://geonode.pacificdata.org/geoserver"
 TILE_SERVER_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -780,12 +803,27 @@ THREDDS_SERVER_URL = "https://ocean-thredds01.spc.int/thredds/wms"
 
 
 def compress_data(data: bytes) -> bytes:
-    """Compress data using gzip with maximum compression"""
-    return gzip.compress(data, compresslevel=9)
+    """Compress data using gzip. Level 1: PNGs barely shrink, so higher levels only cost CPU."""
+    return gzip.compress(data, compresslevel=1)
 
 def decompress_data(data: bytes) -> bytes:
     """Decompress gzipped data"""
     return gzip.decompress(data)
+
+def serve_cached_gzip(request: Request, cache_path: Path, media_type: str):
+    """Serve a .gz cache file. Clients that accept gzip get the file as-is (no CPU spent)."""
+    if "gzip" in request.headers.get("accept-encoding", ""):
+        return FileResponse(
+            cache_path,
+            media_type=media_type,
+            headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding", "X-Cache-Status": "HIT"}
+        )
+    with open(cache_path, 'rb') as f:
+        return Response(
+            content=decompress_data(f.read()),
+            media_type=media_type,
+            headers={"X-Cache-Status": "HIT"}
+        )
 
 def normalize_wms_params(params: Dict) -> str:
     """Normalize WMS parameters for consistent caching"""
@@ -877,30 +915,24 @@ async def cache_middleware(request: Request, call_next):
             if cache_path.exists():
                 file_age = datetime.now() - datetime.fromtimestamp(cache_path.stat().st_mtime)
                 if file_age < timedelta(days=CACHE_EXPIRE_DAYS):
-                    with open(cache_path, 'rb') as f:
-                        return StreamingResponse(
-                            iter([decompress_data(f.read())]),
-                            media_type="image/png",
-                            headers={"X-Cache-Status": "HIT"}
-                        )
+                    return serve_cached_gzip(request, cache_path, "image/png")
                 else:
                     cache_path.unlink()  # Remove expired cache
-            
+
             # Fetch from tile server if not in cache
             tile_url = TILE_SERVER_URL.format(z=z, x=x, y=y)
-            
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(tile_url)
-                response.raise_for_status()
-                
-                # Cache and return the response
-                cache_path.write_bytes(compress_data(response.content))
-                
-                return StreamingResponse(
-                    iter([response.content]),
-                    media_type="image/png",
-                    headers={"X-Cache-Status": "MISS"}
-                )
+
+            response = await http_client.get(tile_url)
+            response.raise_for_status()
+
+            # Cache and return the response
+            cache_path.write_bytes(compress_data(response.content))
+
+            return Response(
+                content=response.content,
+                media_type="image/png",
+                headers={"X-Cache-Status": "MISS"}
+            )
                 
         except Exception as e:
             return JSONResponse(
@@ -924,30 +956,24 @@ async def cache_middleware(request: Request, call_next):
                     if cache_path.exists():
                         file_age = datetime.now() - datetime.fromtimestamp(cache_path.stat().st_mtime)
                         if file_age < timedelta(days=CACHE_EXPIRE_DAYS):
-                            with open(cache_path, 'rb') as f:
-                                return StreamingResponse(
-                                    iter([decompress_data(f.read())]),
-                                    media_type="image/png",
-                                    headers={"X-Cache-Status": "HIT"}
-                                )
+                            return serve_cached_gzip(request, cache_path, "image/png")
                         else:
                             cache_path.unlink()  # Remove expired cache
-                    
+
                     # Determine actual GeoServer URL
                     geoserver_path = path.split("/cache/")[1].split("/", 1)[1]
                     geoserver_url = f"{GEOSERVER_URL}/{geoserver_path}?{normalized_params}"
-                    
-                    async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.get(geoserver_url)
-                        response.raise_for_status()
-                        
-                        cache_path.write_bytes(compress_data(response.content))
-                        
-                        return StreamingResponse(
-                            iter([response.content]),
-                            media_type=response.headers.get('content-type', 'image/png'),
-                            headers={"X-Cache-Status": "MISS"}
-                        )
+
+                    response = await http_client.get(geoserver_url)
+                    response.raise_for_status()
+
+                    cache_path.write_bytes(compress_data(response.content))
+
+                    return Response(
+                        content=response.content,
+                        media_type=response.headers.get('content-type', 'image/png'),
+                        headers={"X-Cache-Status": "MISS"}
+                    )
                         
                 except Exception as e:
                     return JSONResponse(
