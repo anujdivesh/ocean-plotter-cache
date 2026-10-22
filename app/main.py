@@ -526,6 +526,34 @@ def _generate_legend(mode, min_color, max_color, step, color, unit, no_zero):
         buf.seek(0)
         return Response(content=buf.getvalue(), media_type="image/png", headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
+    if mode == 'chl_log':
+        # Chlorophyll-a colour scale (NASA OceanColor style), log scale 0.01-20 mg/m³
+        chl_cmap = mpl.colors.LinearSegmentedColormap.from_list("chlorophyll_a", [
+            (0.00, "#7a0087"),   # purple
+            (0.13, "#1400ff"),   # blue
+            (0.31, "#00c8ff"),   # light blue / cyan
+            (0.43, "#00ff96"),   # aqua green
+            (0.52, "#14ff00"),   # green
+            (0.63, "#ffff00"),   # yellow
+            (0.75, "#ff9600"),   # orange
+            (0.88, "#ff0000"),   # red
+            (1.00, "#6e0000"),   # dark red
+        ], N=256)
+        chl_ticks = [0.01, 0.03, 0.1, 0.3, 1, 3, 10]
+
+        # Same figure size, layout and font sizes as the standard legend
+        fig, ax = plt.subplots(figsize=(6, 1), facecolor='white')
+        fig.subplots_adjust(bottom=0.5)
+        cb = fig.colorbar(
+            mpl.cm.ScalarMappable(norm=mpl.colors.LogNorm(vmin=0.01, vmax=20.0), cmap=chl_cmap),
+            cax=ax, orientation='horizontal'
+        )
+        cb.set_ticks(chl_ticks)
+        cb.set_ticklabels([f"{t:g}" for t in chl_ticks])
+        cb.minorticks_off()
+        cb.set_label("Chlorophyll a̲ concentration ( mg / m³ )", labelpad=10)
+        return _legend_response(fig)
+
     fig, ax = plt.subplots(figsize=(6, 1), facecolor='white')
     fig.subplots_adjust(bottom=0.5)
 
