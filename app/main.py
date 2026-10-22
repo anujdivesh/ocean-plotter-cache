@@ -318,6 +318,12 @@ def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: st
                 local_path=check_local, local_path_str=local_file_name)
             Plotter.plot_levels_contour(ax2, ax_legend, lons, lats, chl_data,cmap_name, units=units,levels=levels,)
 
+        elif plot_type == "chl_log":
+            lons, lats, chl_data = Plotter.getfromDAP(dap_url, time, dap_variable, adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
+            Plotter.plot_chl_log(ax2, ax_legend, lons, lats, chl_data,\
+                min_color_plot=min_color_plot, max_color_plot=max_color_plot, units=units)
+
         elif plot_type == "climate":
             split_varib = dap_variable.split(",")
             lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, split_varib[0],adjust_lon=True,\

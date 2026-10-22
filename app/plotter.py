@@ -1992,6 +1992,41 @@ class Plotter:
         return cs, cbar
 
     @staticmethod
+    def plot_chl_log(ax, ax_legend, lons, lats, chl_data, min_color_plot=0.01, max_color_plot=20.0, units='mg/m³'):
+        """Chlorophyll-a on a log scale (NASA OceanColor style rainbow), as in plotchl.py."""
+        cmap = mcolors.LinearSegmentedColormap.from_list("chlorophyll_a", [
+            (0.00, "#7a0087"),   # purple
+            (0.13, "#1400ff"),   # blue
+            (0.31, "#00c8ff"),   # light blue / cyan
+            (0.43, "#00ff96"),   # aqua green
+            (0.52, "#14ff00"),   # green
+            (0.63, "#ffff00"),   # yellow
+            (0.75, "#ff9600"),   # orange
+            (0.88, "#ff0000"),   # red
+            (1.00, "#6e0000"),   # dark red
+        ], N=256)
+        cmap.set_under(cmap(0.0))
+        cmap.set_over(cmap(1.0))
+        cmap.set_bad("lightgray")  # missing data
+
+        # Log scale needs a positive minimum
+        vmin = min_color_plot if min_color_plot > 0 else 0.01
+        vmax = max_color_plot if max_color_plot > vmin else 20.0
+        norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
+
+        cs = ax.pcolormesh(lons, lats, chl_data, cmap=cmap, norm=norm, shading='auto')
+
+        ticks = [t for t in [0.01, 0.03, 0.1, 0.3, 1, 3, 10] if vmin <= t <= vmax]
+        cbar = plt.colorbar(cs, cax=ax_legend, extend='both')
+        cbar.set_ticks(ticks)
+        cbar.set_ticklabels([f"{t:g}" for t in ticks])
+        cbar.minorticks_off()
+        cbar.set_label(units, fontsize=8)
+        cbar.ax.tick_params(labelsize=7)
+
+        return cs, cbar
+
+    @staticmethod
     def plot_levels_contour(ax, ax_legend, lons, lats, chl_data, cmap_name='jet',
                             units='mg/m³', levels=None, add_contours=True,
                             contour_kwargs=None):
