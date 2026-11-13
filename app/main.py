@@ -332,6 +332,20 @@ def generate_plot_2(request: Request,region: int = 1,layer_map: int = 2,time: st
                 min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,
                 local_path=check_local, local_path_str=local_file_name
             )
+        elif plot_type == "tuna":
+            # get_map_url e.g. tuna/jet/0/32.1/2/°C/['25.9','30.7','#000000']/null
+            # levels holds the parsed shading ranges [(lower, upper, colour), ...]
+            split_varib = dap_variable.split(",")
+            lon, lat, data_extract = Plotter.getfromDAP(dap_url, time, split_varib[0], adjust_lon=True,\
+                local_path=check_local, local_path_str=local_file_name)
+            try:
+                map_lon_span = float(east_bound) - float(west_bound)
+            except (TypeError, ValueError):
+                map_lon_span = None
+            cs, cbar = Plotter.plot_tuna(is_imperial_layer, ax=ax2, ax_legend=ax_legend, lon=lon, lat=lat, data=data_extract,\
+                min_color_plot=min_color_plot, max_color_plot=max_color_plot, steps=steps, cmap_name=cmap_name, units=units,
+                shade_ranges=levels, map_lon_span=map_lon_span
+            )
         elif plot_type == "currents":
             lon, lat, uo = Plotter.getfromDAP(dap_url, time, 'uo', adjust_lon=True,\
                 local_path=check_local, local_path_str=local_file_name)

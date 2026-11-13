@@ -33,8 +33,11 @@ import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import colors
 import re
+import ast
 import functools
 from matplotlib.collections import PolyCollection, LineCollection
+from matplotlib.legend_handler import HandlerBase
+from matplotlib.patches import Rectangle
 matplotlib.use('Agg')  # Non-interactive backend
 
 
@@ -117,6 +120,26 @@ def _load_eez_lines(local_path):
 @functools.lru_cache(maxsize=4)
 def _load_city_names(city_file):
     return pd.read_json(city_file)
+
+
+class _DottedBox:
+    """Legend handle for a "tuna" shading range: a filled box with 3 dots in it."""
+    def __init__(self, fill, colour, edge_width=0.8):
+        self.fill = fill
+        self.colour = colour
+        self.edge_width = edge_width
+
+
+class _DottedBoxHandler(HandlerBase):
+    def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):
+        x0, y0 = -xdescent, -ydescent
+        box = Rectangle((x0, y0), width, height, facecolor=orig_handle.fill,
+                        edgecolor=orig_handle.colour, linewidth=min(orig_handle.edge_width, 0.5),
+                        transform=trans)
+        dots = Line2D(x0 + width * np.array([0.22, 0.5, 0.78]), np.full(3, y0 + height / 2.0),
+                      linestyle='none', marker='o', markersize=1.2,
+                      markerfacecolor=orig_handle.colour, markeredgewidth=0, transform=trans)
+        return [box, dots]
 plt.switch_backend('Agg') 
 
 class Plotter:
@@ -1013,11 +1036,54 @@ class Plotter:
         steps = float(plotter_config[4])
         units = plotter_config[5]
         levels = []
-        if plotter_config[6] != "null":
+        if plot_type == "tuna":
+            # For "tuna" the levels slot holds shading ranges, not numbers:
+            # ['25.9','30.7','#000000'] -> [(25.9, 30.7, '#000000')]
+            levels = Plotter.parse_shade_ranges(plotter_config[6])
+        elif plotter_config[6] != "null":
             levels = np.array(eval(plotter_config[6]), dtype=float)
         discrete = plotter_config[7]
-        
+
         return cmap_name, plot_type, min_color_plot,max_color_plot,steps,units,levels,discrete
+
+    @staticmethod
+    def parse_shade_ranges(range_str):
+        """
+        Parse the shading ranges of a "tuna" layer into [(lower, upper, colour), ...].
+
+        Accepts one range or several, flat or nested:
+            ['25.9','30.7','#000000']
+            ['16.6','22.0','#ffffff','26.0','29.9','#000000']
+            [['16.6','22.0','#ffffff'],['26.0','29.9','#000000']]
+        """
+        if range_str is None or range_str.strip() in ("", "null", "[]"):
+            return []
+        parsed = ast.literal_eval(range_str.strip())
+
+        flat = []
+        def _flatten(item):
+            if isinstance(item, (list, tuple)):
+                for sub in item:
+                    _flatten(sub)
+            else:
+                flat.append(item)
+        _flatten(parsed)
+
+        if len(flat) % 3 != 0:
+            raise ValueError(
+                f"Shading ranges must be groups of [lower, upper, colour], got: {range_str}"
+            )
+
+        ranges = []
+        for i in range(0, len(flat), 3):
+            lower, upper = float(flat[i]), float(flat[i + 1])
+            colour = str(flat[i + 2]).strip()
+            if lower > upper:
+                lower, upper = upper, lower
+            if not mcolors.is_color_like(colour):
+                raise ValueError(f"Invalid shading colour '{colour}' in: {range_str}")
+            ranges.append((lower, upper, colour))
+        return ranges
 
     @staticmethod
     def plot_filled_contours_no_zero(is_imperial_layer,ax, ax_legend, lon, lat, data, 
@@ -1584,9 +1650,105 @@ class Plotter:
         cbar.set_label(units, fontsize=6, rotation=0, va='center', ha='left', labelpad=1)
 
         return cs, cbar
-    
+
     @staticmethod
-    def plot_filled_pcolor(ax, ax_legend, lon, lat, data, 
+    def plot_tuna(is_imperial_layer, ax, ax_legend, lon, lat, data,
+                  min_color_plot, max_color_plot, steps,
+                  cmap_name='jet', units='°C', shade_ranges=None,
+                  map_lon_span=None, dots_across=90, dot_size=0.6, outline_width=0.8):
+        """
+        SST in banded colours with each preferred SST range dotted and outlined
+        (same look as the THREDDS WMS fishery styles).
+
+        shade_ranges: [(lower, upper, colour), ...]; a dot is drawn where
+                      lower < SST <= upper, outlines at lower and upper.
+        map_lon_span: width of the map in degrees, used to keep the dot spacing
+                      similar across regions (falls back to the data extent).
+        """
+        shade_ranges = shade_ranges or []
+
+        # Colour bands, e.g. 0/32.1/2 -> 0, 2, ..., 32
+        levels = np.arange(min_color_plot, max_color_plot, steps)
+        data_masked = Plotter._mask_sst(data, units_hint=units)
+
+        cmap = plt.get_cmap(cmap_name)
+        norm = BoundaryNorm(levels, ncolors=cmap.N, extend='both')
+        mesh = ax.pcolormesh(lon, lat, data_masked, cmap=cmap, norm=norm,
+                             shading='auto', zorder=1)
+
+        lon = np.asarray(lon)
+        lat = np.asarray(lat)
+
+        # 1 dot every `stride` grid cells, so ~dots_across dots span the map
+        stride = 1
+        if lon.ndim == 1 and lon.size > 1:
+            dlon = float(np.nanmedian(np.abs(np.diff(lon))))
+            try:
+                span = abs(float(map_lon_span))
+            except (TypeError, ValueError):
+                span = 0.0
+            if span <= 0:
+                span = float(np.nanmax(lon) - np.nanmin(lon))
+            if dlon > 0:
+                stride = max(1, int(round(span / dlon / dots_across)))
+
+        offset = stride // 2
+        if lon.ndim == 1:
+            sub_lon2d, sub_lat2d = np.meshgrid(lon[offset::stride], lat[offset::stride])
+        else:
+            sub_lon2d = lon[offset::stride, offset::stride]
+            sub_lat2d = lat[offset::stride, offset::stride]
+        sub_vals = np.ma.filled(
+            np.ma.asarray(data_masked)[offset::stride, offset::stride].astype(float), np.nan
+        )
+
+        legend_elements = []
+        for lower, upper, colour in shade_ranges:
+            # Dots inside the range (NaN compares False, so land is skipped)
+            with np.errstate(invalid='ignore'):
+                inside = (sub_vals > lower) & (sub_vals <= upper)
+            if np.any(inside):
+                ax.scatter(sub_lon2d[inside], sub_lat2d[inside], s=dot_size, c=colour,
+                           marker='o', linewidths=0, zorder=3)
+
+            # Outline at the lower and upper temperature of the range
+            try:
+                ax.contour(lon, lat, data_masked, levels=[lower, upper], colors=colour,
+                           linewidths=outline_width, zorder=4, corner_mask=True)
+            except Exception as e:
+                print(f"Shading outline {lower}-{upper} not plotted: {e}")
+
+            if is_imperial_layer and 'C' in units:
+                label = f"{lower * 9/5 + 32:g}–{upper * 9/5 + 32:g} °F"
+            else:
+                label = f"{lower:g}–{upper:g} {units}"
+            # Box filled with the map colour at the middle of the range, 3 dots inside
+            fill = cmap(norm((lower + upper) / 2.0))
+            legend_elements.append((_DottedBox(fill, colour, outline_width), label))
+
+        if legend_elements:
+            handles, labels = zip(*legend_elements)
+            leg = ax.legend(handles, labels, handler_map={_DottedBox: _DottedBoxHandler()},
+                            loc='upper right', fontsize=4.5, title='Preferred SST', title_fontsize=4.5,
+                            framealpha=0.85, handlelength=1.8, handleheight=1.1,
+                            borderpad=0.3, labelspacing=0.3, handletextpad=0.4, borderaxespad=0.3)
+            leg.get_frame().set_linewidth(0.4)
+            leg.set_zorder(10)
+
+        # Colorbar
+        cbar = plt.colorbar(mesh, cax=ax_legend, extend='both')
+        cbar.set_ticks(levels)
+        if is_imperial_layer and 'C' in units:
+            cbar.set_ticklabels([f"{(lv * 9/5) + 32:.0f}" for lv in levels])
+            cbar.set_label('(°F)', fontsize=7, rotation=0, va='center', ha='left', labelpad=1)
+        else:
+            cbar.set_label(units, fontsize=6, rotation=0, va='center', ha='left', labelpad=1)
+        cbar.ax.tick_params(labelsize=7)
+
+        return mesh, cbar
+
+    @staticmethod
+    def plot_filled_pcolor(ax, ax_legend, lon, lat, data,
                     min_color_plot, max_color_plot, steps,
                     cmap_name='RdBu_r', units='(°C)'):
         # Create fixed levels for color normalization (include the max endpoint
