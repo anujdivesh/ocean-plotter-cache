@@ -123,9 +123,8 @@ def _load_city_names(city_file):
 
 
 class _DottedBox:
-    """Legend handle for a "tuna" shading range: a filled box with 3 dots in it."""
-    def __init__(self, fill, colour, edge_width=0.8):
-        self.fill = fill
+    """Legend handle for a "tuna" shading range: an outlined box (no fill) with 3 dots in it."""
+    def __init__(self, colour, edge_width=0.8):
         self.colour = colour
         self.edge_width = edge_width
 
@@ -133,7 +132,7 @@ class _DottedBox:
 class _DottedBoxHandler(HandlerBase):
     def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):
         x0, y0 = -xdescent, -ydescent
-        box = Rectangle((x0, y0), width, height, facecolor=orig_handle.fill,
+        box = Rectangle((x0, y0), width, height, facecolor='none',
                         edgecolor=orig_handle.colour, linewidth=min(orig_handle.edge_width, 0.5),
                         transform=trans)
         dots = Line2D(x0 + width * np.array([0.22, 0.5, 0.78]), np.full(3, y0 + height / 2.0),
@@ -1722,9 +1721,8 @@ class Plotter:
                 label = f"{lower * 9/5 + 32:g}–{upper * 9/5 + 32:g} °F"
             else:
                 label = f"{lower:g}–{upper:g} {units}"
-            # Box filled with the map colour at the middle of the range, 3 dots inside
-            fill = cmap(norm((lower + upper) / 2.0))
-            legend_elements.append((_DottedBox(fill, colour, outline_width), label))
+            # Outlined box (no fill) with 3 dots, in the range colour
+            legend_elements.append((_DottedBox(colour, outline_width), label))
 
         if legend_elements:
             handles, labels = zip(*legend_elements)
